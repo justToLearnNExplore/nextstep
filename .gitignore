@@ -1,0 +1,10 @@
+.env
+*.keystore
+local.properties
+.gradle/
+build/
+__pycache__/
+.venv/
+node_modules/
+service-account*.json
+.DS_Store
