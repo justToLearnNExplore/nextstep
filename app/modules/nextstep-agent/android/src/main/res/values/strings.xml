@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <string name="nextstep_service_label">NextStep helper</string>
+  <string name="nextstep_service_summary">Shows the NextStep button and does phone tasks you approve.</string>
+  <string name="nextstep_service_description">NextStep is an accessibility tool for older adults. With this permission it can read what is on your screen and tap, type and scroll for you, but only for tasks you ask for and approve. It never reads or types passwords, PINs, OTPs or card details, and it always asks you before sending a message, placing an order, installing an app or opening a payment page. You can stop it at any time with the red Stop button.</string>
+  <string name="nextstep_notification_label">NextStep scam check</string>
+</resources>

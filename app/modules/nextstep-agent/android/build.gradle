@@ -1,0 +1,24 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'com.northstar.nextstep.agent'
+version = '0.1.0'
+
+android {
+  namespace "com.northstar.nextstep.agent"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+    // AccessibilityService.takeScreenshot and ACTION_IME_ENTER need Android 11+.
+    minSdkVersion 30
+  }
+  lintOptions {
+    abortOnError false
+  }
+}
+
+dependencies {
+  implementation "androidx.core:core-ktx:1.13.1"
+}
