@@ -139,7 +139,7 @@ class BubbleOverlay(
     }
   }
 
-  fun showMenu() = main.post {
+  fun showMenu(): Boolean = main.post {
     closePopupNow()
     val card = card().apply {
       addView(bigButton(t("openApp", "Open an app"), Style.OUTLINE, "▦") { showApps() })
@@ -156,7 +156,7 @@ class BubbleOverlay(
     showPopup(card)
   }
 
-  fun showApps() = main.post {
+  fun showApps(): Boolean = main.post {
     closePopupNow()
     val apps = listOf(
       "whatsapp" to t("appWhatsapp", "WhatsApp"),
