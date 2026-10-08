@@ -3,6 +3,9 @@ package com.northstar.nextstep.agent.agent
 import android.content.Intent
 import android.net.Uri
 import android.provider.MediaStore
+import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.content.FileProvider
+import java.io.File
 import com.northstar.nextstep.agent.AgentBus
 import com.northstar.nextstep.agent.Prefs
 import com.northstar.nextstep.agent.exec.ActionExecutor
@@ -69,6 +72,14 @@ class AgentRunner(
       val plan = res.getJSONObject("plan")
       if (plan.optBoolean("refused")) {
         say(plan.optString("summary"), finalMessage = true); return@execute
+      }
+      // Medicine photos use NextStep's own guided camera; sending is confirmed there.
+      if (plan.optString("special_flow") == "medicine_photo") {
+        overlay.hidePanel()
+        val to = plan.optString("recipient").ifBlank { "doctor" }
+        service.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("nextstep://medicine?to=$to"))
+          .setPackage(service.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+        return@execute
       }
       val steps = plan.optJSONArray("steps").strings()
       val approved = ask(plan.getString("summary"), t("yesDoIt", "Yes, do it"), t("no", "No"), steps)
@@ -217,6 +228,69 @@ class AgentRunner(
     if (intent == null) { say(t("appMissing", "That app is not installed.")); return@execute }
     service.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     log("open_app", JSONObject().put("app", key))
+  }
+
+  /**
+   * Medicine photo → WhatsApp. Opens the recipient's chat with the photo and caption attached,
+   * then asks the user before tapping Send. If WhatsApp can't jump to the contact, the user picks
+   * the chat and sends themselves; NextStep never sends without a yes.
+   */
+  fun shareImageToWhatsApp(path: String, phone: String?, caption: String, recipient: String) = worker.execute {
+    stopped.set(false)
+    overlay.setBusy(true)
+    try {
+      val pkg = listOf("com.whatsapp", "com.whatsapp.w4b").firstOrNull { executor.isInstalled(it) }
+        ?: run { say(t("whatsappMissing", "WhatsApp is not installed."), finalMessage = true); return@execute }
+      val uri = FileProvider.getUriForFile(service, "${service.packageName}.nextstep.files", File(path))
+      val jid = phone?.let { whatsappJid(it) }
+      service.startActivity(Intent(Intent.ACTION_SEND).apply {
+        type = "image/jpeg"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        putExtra(Intent.EXTRA_TEXT, caption)
+        jid?.let { putExtra("jid", it) }
+        setPackage(pkg)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+      })
+      log("share", JSONObject().put("app", pkg).put("recipient", recipient).put("direct", jid != null))
+
+      val isSend = { n: AccessibilityNodeInfo ->
+        n.packageName?.toString() == pkg && n.isVisibleToUser &&
+          (n.viewIdResourceName == "$pkg:id/send" || n.contentDescription?.toString().equals("Send", true))
+      }
+      if (jid == null || executor.waitForNode(10_000, isSend) == null) {
+        say(t("pickChatYourself", "Please choose the chat and tap Send yourself."), finalMessage = true)
+        return@execute
+      }
+      if (stopped.get()) return@execute
+
+      val question = t("confirmSendPhoto", "Send this medicine photo to {name} on WhatsApp?").replace("{name}", recipient)
+      if (!ask(question, t("yesSend", "Yes, send"), t("no", "No"))) {
+        say(t("notSent", "Okay, I did not send it."), finalMessage = true)
+        return@execute
+      }
+      // Re-find right before tapping: the node from before the question may be stale.
+      val sent = overlay.whileHidden {
+        executor.waitForNode(3_000, isSend)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
+      }
+      log("share_sent", JSONObject().put("recipient", recipient).put("ok", sent))
+      say(if (sent) t("photoSent", "Sent.") else t("pickChatYourself", "Please tap Send yourself."), finalMessage = true)
+    } catch (e: Exception) {
+      log("error", JSONObject().put("message", e.message))
+      say(t("somethingWrong", "Sorry, something went wrong. I have stopped."), finalMessage = true)
+    } finally {
+      overlay.setBusy(false)
+    }
+  }
+
+  /** "98765 43210" or "+91 98765-43210" → "919876543210@s.whatsapp.net" (India default). */
+  private fun whatsappJid(phone: String): String? {
+    val d = phone.filter(Char::isDigit).trimStart('0')
+    val full = when {
+      d.length == 10 -> "91$d"
+      d.length in 11..15 -> d
+      else -> return null
+    }
+    return "$full@s.whatsapp.net"
   }
 
   // ---- user dialogue ---------------------------------------------------------------------

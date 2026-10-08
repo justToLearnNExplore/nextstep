@@ -35,6 +35,10 @@ export default function Talk() {
     NextStepAgent.minimizeApp();
   };
 
+  // The medicine card goes straight to NextStep's guided camera; other cards start an agent task.
+  const open = (c: (typeof CARDS)[number]) =>
+    c.label === 'cardMedicinePhoto' ? router.push('/medicine?to=doctor') : start(t(c.goal));
+
   const speak = async () => {
     if (listening) {
       NextStepAgent.cancelListening();
@@ -72,12 +76,12 @@ export default function Talk() {
       <View style={styles.grid}>
         <View style={styles.row}>
           {CARDS.slice(0, 2).map((c) => (
-            <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => start(t(c.goal))} />
+            <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => open(c)} />
           ))}
         </View>
         <View style={styles.row}>
           {CARDS.slice(2).map((c) => (
-            <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => start(t(c.goal))} />
+            <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => open(c)} />
           ))}
         </View>
       </View>

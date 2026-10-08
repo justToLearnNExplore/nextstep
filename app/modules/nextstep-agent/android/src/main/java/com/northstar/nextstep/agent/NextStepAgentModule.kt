@@ -79,6 +79,24 @@ class NextStepAgentModule : Module() {
     Function("showBubble") { prefs.overlayEnabled = true; requireService().overlay.show(); Unit }
     Function("hideBubble") { prefs.overlayEnabled = false; service?.overlay?.remove(); Unit }
 
+    /** Medicine photo → WhatsApp with a confirmed Send. Falls back to a plain share if the service is off. */
+    Function("shareImageToWhatsApp") { path: String, phone: String?, caption: String, recipient: String ->
+      val svc = service
+      if (svc != null) {
+        svc.runner.shareImageToWhatsApp(path, phone, caption, recipient)
+      } else {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+          context, "${context.packageName}.nextstep.files", java.io.File(path))
+        context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).apply {
+          type = "image/jpeg"
+          putExtra(Intent.EXTRA_STREAM, uri)
+          putExtra(Intent.EXTRA_TEXT, caption)
+          addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+      }
+      Unit
+    }
+
     Function("isAppInstalled") { pkg: String ->
       runCatching { context.packageManager.getPackageInfo(pkg, 0); true }.getOrDefault(false)
     }

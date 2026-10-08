@@ -1,6 +1,9 @@
 {
   "platforms": ["android"],
   "android": {
-    "modules": ["com.northstar.nextstep.agent.NextStepAgentModule"]
+    "modules": [
+      "com.northstar.nextstep.agent.NextStepAgentModule",
+      "com.northstar.nextstep.agent.medicine.MedicineCameraModule"
+    ]
   }
 }

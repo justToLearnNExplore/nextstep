@@ -92,7 +92,34 @@ class TaskPlan(BaseModel):
     target_package: str | None = Field(default=None, description="Android package of the target app if known.")
     sensitive_steps: list[str] = Field(default_factory=list, description="Steps where NextStep will stop and ask (send, order, install, payment).")
     refused: bool = Field(default=False, description="True if the request is unsafe or impossible.")
+    special_flow: Literal["medicine_photo"] | None = Field(
+        default=None, description="'medicine_photo' when the user wants to photograph a medicine/prescription and share it."
+    )
+    recipient: Literal["doctor", "family"] | None = Field(
+        default=None, description="For medicine_photo: who to send it to, if the user said so."
+    )
     operator_goal: str = Field(description="Precise English instruction for the phone operator agent.")
+
+
+class MedicineRequest(BaseModel):
+    language: str = "en-IN"
+    image_b64: str
+    ocr_text: str = ""
+    recipient: Literal["doctor", "family"] = "doctor"
+    sender_name: str | None = None
+
+
+class MedicineInfo(BaseModel):
+    """What is on the label, read from the photo. Identification only, never medical advice."""
+
+    readable: bool = Field(description="False if the label cannot be read reliably.")
+    name: str | None = Field(default=None, description="Brand name as printed, e.g. 'Dolo 650'.")
+    generic: str | None = Field(default=None, description="Active ingredient(s) and strength, e.g. 'Paracetamol 650 mg'.")
+    form: str | None = Field(default=None, description="tablet, syrup, capsule, injection, ointment...")
+    expiry: str | None = Field(default=None, description="Expiry as printed, e.g. '08/2027'.")
+    expired: bool | None = Field(default=None, description="True only if the printed expiry is clearly before today's date.")
+    say_to_user: str = Field(description="1-2 short sentences in the user's language: what medicine this looks like; mention if expired or unreadable.")
+    caption: str = Field(description="WhatsApp caption to the recipient in the user's language, written as the user (first person), e.g. asking the doctor to check this medicine.")
 
 
 class StartTaskResponse(BaseModel):

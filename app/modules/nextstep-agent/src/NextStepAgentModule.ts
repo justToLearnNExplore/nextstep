@@ -13,6 +13,8 @@ declare class NextStepAgentModule extends NativeModule<NextStepAgentEvents> {
   understandScreen(): void;
   showBubble(): void;
   hideBubble(): void;
+  /** Opens the recipient's WhatsApp chat with the photo; the overlay asks before tapping Send. */
+  shareImageToWhatsApp(path: string, phone: string | null, caption: string, recipientName: string): void;
   isAppInstalled(packageName: string): boolean;
   minimizeApp(): void;
   listenOnce(language: string): Promise<string | null>;

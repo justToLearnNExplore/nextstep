@@ -2,6 +2,8 @@
 
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="android.permission.CAMERA" />
+  <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
   <!-- Package visibility: launcher apps (for "open app by name") and the apps we automate. -->
   <queries>
@@ -17,11 +19,23 @@
     </intent>
     <package android:name="com.grofers.customerapp" />
     <package android:name="com.whatsapp" />
+    <package android:name="com.whatsapp.w4b" />
     <package android:name="com.google.android.youtube" />
     <package android:name="com.android.vending" />
   </queries>
 
   <application>
+    <!-- Shares the captured medicine photo with WhatsApp without exposing other files. -->
+    <provider
+      android:name="androidx.core.content.FileProvider"
+      android:authorities="${applicationId}.nextstep.files"
+      android:exported="false"
+      android:grantUriPermissions="true">
+      <meta-data
+        android:name="android.support.FILE_PROVIDER_PATHS"
+        android:resource="@xml/nextstep_file_paths" />
+    </provider>
+
     <service
       android:name="com.northstar.nextstep.agent.NextStepAccessibilityService"
       android:exported="false"
