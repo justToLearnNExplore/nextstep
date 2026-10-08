@@ -141,6 +141,25 @@ class ActionExecutor(private val service: AccessibilityService) {
     }
   }
 
+  /**
+   * Polls the active window until a node matches, e.g. WhatsApp's Send button after a share
+   * intent. Returns null on timeout. Caller must not hold the node across long waits.
+   */
+  fun waitForNode(timeoutMs: Long, match: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+      service.rootInActiveWindow?.let { root -> find(root, match)?.let { return it } }
+      Thread.sleep(250)
+    }
+    return null
+  }
+
+  private fun find(node: AccessibilityNodeInfo, match: (AccessibilityNodeInfo) -> Boolean): AccessibilityNodeInfo? {
+    if (match(node)) return node
+    for (i in 0 until node.childCount) node.getChild(i)?.let { c -> find(c, match)?.let { return it } }
+    return null
+  }
+
   /** Give the UI time to react before the next screenshot. */
   private fun settle(ms: Long = 700) = Thread.sleep(ms)
 

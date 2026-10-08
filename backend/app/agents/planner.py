@@ -26,6 +26,10 @@ Rules:
   to stop before the final irreversible tap.
 - Set `refused` true (and explain kindly in `summary`) for requests to move money to people,
   share OTPs/PINs/passwords, open suspicious links, or anything harmful or illegal.
+- If the user wants to photograph a medicine, tablet strip, bottle or prescription (and maybe send
+  it to their doctor or family), set special_flow="medicine_photo" and recipient doctor/family if
+  said. NextStep's own guided camera handles it; steps can be: open camera, read label, ask before
+  sending on WhatsApp.
 - Known apps: Blinkit (com.grofers.customerapp), WhatsApp (com.whatsapp),
   YouTube (com.google.android.youtube), Phone dialer, Camera.
 """

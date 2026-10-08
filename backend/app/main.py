@@ -5,6 +5,7 @@ import logging
 from fastapi import Depends, FastAPI, HTTPException
 
 from .agents.explainer import explain_screen
+from .agents.medicine_reader import read_medicine
 from .agents.planner import plan_task
 from .agents.scam_shield import check_message
 from .auth import current_user
@@ -13,6 +14,8 @@ from .operator import next_actions
 from .protocol import (
     ConsentRequest,
     ExplainRequest,
+    MedicineInfo,
+    MedicineRequest,
     ScamCheckRequest,
     ScamCheckResponse,
     ScreenExplanation,
@@ -108,3 +111,9 @@ async def scam_check(req: ScamCheckRequest, user: str = Depends(current_user)) -
     res = await check_message(req)
     log.info("scam_check user=%s risk=%s reasons=%s", user, res.risk, res.reasons)
     return res
+
+
+@app.post("/v1/medicine/read", response_model=MedicineInfo)
+async def medicine_read(req: MedicineRequest, user: str = Depends(current_user)) -> MedicineInfo:
+    # The photo is processed in memory only; it is never stored server-side.
+    return await read_medicine(req)

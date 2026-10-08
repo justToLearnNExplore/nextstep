@@ -21,4 +21,12 @@ android {
 
 dependencies {
   implementation "androidx.core:core-ktx:1.13.1"
+
+  // Medicine photo: in-app camera with on-device label-readability guidance.
+  def camerax = "1.6.2"
+  implementation "androidx.camera:camera-core:$camerax"
+  implementation "androidx.camera:camera-camera2:$camerax"
+  implementation "androidx.camera:camera-lifecycle:$camerax"
+  implementation "androidx.camera:camera-view:$camerax"
+  implementation "com.google.mlkit:text-recognition:16.0.1"
 }
