@@ -3,6 +3,9 @@
   <uses-permission android:name="android.permission.INTERNET" />
   <uses-permission android:name="android.permission.RECORD_AUDIO" />
   <uses-permission android:name="android.permission.CAMERA" />
+  <!-- Android 10 screen capture (MediaProjection) runs in a foreground service. -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
   <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
   <!-- Package visibility: launcher apps (for "open app by name") and the apps we automate. -->
@@ -48,6 +51,11 @@
         android:name="android.accessibilityservice"
         android:resource="@xml/nextstep_accessibility_config" />
     </service>
+
+    <service
+      android:name="com.northstar.nextstep.agent.screen.ProjectionService"
+      android:exported="false"
+      android:foregroundServiceType="mediaProjection" />
 
     <service
       android:name="com.northstar.nextstep.agent.notify.NotificationWatcher"

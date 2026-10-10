@@ -11,8 +11,8 @@ android {
   defaultConfig {
     versionCode 1
     versionName "0.1.0"
-    // AccessibilityService.takeScreenshot and ACTION_IME_ENTER need Android 11+.
-    minSdkVersion 30
+    // Android 10+. Screenshots: AccessibilityService.takeScreenshot on 11+, MediaProjection on 10.
+    minSdkVersion 29
   }
   lintOptions {
     abortOnError false

@@ -19,6 +19,9 @@ declare class NextStepAgentModule extends NativeModule<NextStepAgentEvents> {
   minimizeApp(): void;
   listenOnce(language: string): Promise<Heard>;
   cancelListening(): void;
+  /** Android 10: true until the user allows screen capture for this session. */
+  needsScreenCapturePermission(): boolean;
+  requestScreenCapture(): Promise<boolean>;
 }
 
 export default requireNativeModule<NextStepAgentModule>('NextStepAgent');
