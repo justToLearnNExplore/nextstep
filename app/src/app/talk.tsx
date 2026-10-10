@@ -25,12 +25,14 @@ export default function Talk() {
   const [status, setStatus] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
 
-  const start = (goal: string) => {
+  const start = async (goal: string) => {
     if (!NextStepAgent.isAccessibilityEnabled()) {
       setStatus(t('serviceOff'));
       NextStepAgent.openAccessibilitySettings();
       return;
     }
+    // Android 10: ask once per session to see the screen (optional; text-only works without it).
+    if (NextStepAgent.needsScreenCapturePermission()) await NextStepAgent.requestScreenCapture();
     NextStepAgent.startTask(goal);
     NextStepAgent.minimizeApp();
   };

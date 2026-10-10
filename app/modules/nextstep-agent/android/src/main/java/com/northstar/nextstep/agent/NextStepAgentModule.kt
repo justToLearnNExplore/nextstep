@@ -6,6 +6,9 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.os.bundleOf
+import android.app.Activity
+import android.media.projection.MediaProjectionManager
+import com.northstar.nextstep.agent.screen.ProjectionService
 import com.northstar.nextstep.agent.voice.VoiceIO
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
@@ -24,6 +27,7 @@ class NextStepAgentModule : Module() {
   private val prefs get() = Prefs(context)
   private val service get() = NextStepAccessibilityService.instance
   private var voice: VoiceIO? = null
+  private var capturePromise: Promise? = null
 
   private val busListener = AgentBus.Listener { type, payload ->
     sendEvent(AGENT_EVENT, bundleOf("type" to type, "payload" to payload.toString()))
@@ -115,6 +119,25 @@ class NextStepAgentModule : Module() {
     }
 
     Function("cancelListening") { voice?.cancelListening(); Unit }
+
+    /** Android 10 only: asks once per session to allow screen capture. Resolves true when available. */
+    Function("needsScreenCapturePermission") { ProjectionService.needed && ProjectionService.instance == null }
+
+    AsyncFunction("requestScreenCapture") { promise: Promise ->
+      if (!ProjectionService.needed || ProjectionService.instance != null) { promise.resolve(true); return@AsyncFunction }
+      val activity = appContext.currentActivity ?: run { promise.resolve(false); return@AsyncFunction }
+      capturePromise = promise
+      val mpm = activity.getSystemService(MediaProjectionManager::class.java)
+      activity.startActivityForResult(mpm.createScreenCaptureIntent(), ProjectionService.REQUEST_CODE)
+    }
+
+    OnActivityResult { _, payload ->
+      if (payload.requestCode != ProjectionService.REQUEST_CODE) return@OnActivityResult
+      val ok = payload.resultCode == Activity.RESULT_OK && payload.data != null
+      if (ok) ProjectionService.start(context, payload.resultCode, payload.data!!)
+      capturePromise?.resolve(ok)
+      capturePromise = null
+    }
   }
 
   private fun requireService() = service

@@ -7,6 +7,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Path
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
 import org.json.JSONArray
@@ -76,8 +77,8 @@ class ActionExecutor(private val service: AccessibilityService) {
       putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
     }
     if (!field.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) return err("set_text_failed")
-    if (enter) field.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
     settle()
+    if (enter && !imeEnter(field)) return ok().put("note", "enter_unsupported_tap_search_button")
     return ok()
   }
 
@@ -86,10 +87,15 @@ class ActionExecutor(private val service: AccessibilityService) {
     "home" -> global(AccessibilityService.GLOBAL_ACTION_HOME)
     "recents", "app_switch" -> global(AccessibilityService.GLOBAL_ACTION_RECENTS)
     "enter" -> service.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-      ?.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
-      .let { if (it == true) ok() else err("enter_failed") }
+      ?.let { imeEnter(it) }
+      .let { if (it == true) ok() else err("enter_unsupported_tap_search_button") }
     else -> err("unsupported_key:$key")
   }
+
+  /** "Enter"/search key: Android 11+ only. On 10 the model taps the app's search button instead. */
+  private fun imeEnter(field: AccessibilityNodeInfo): Boolean =
+    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+      field.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
 
   private fun global(action: Int): JSONObject {
     val ok = service.performGlobalAction(action)

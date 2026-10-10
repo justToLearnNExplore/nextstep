@@ -85,7 +85,10 @@ class ScreenReader(private val service: AccessibilityService) {
   // 540 px wide is plenty for the model (it reads exact labels from the element list) and
   // roughly halves image tokens compared with 720 px.
   fun screenshot(maxWidth: Int = 540, timeoutMs: Long = 2500): String? {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+      // Android 10: MediaProjection (if the user allowed it); otherwise text-only, which works too.
+      return ProjectionService.instance?.capture()?.let { encode(it, maxWidth) }
+    }
     val future = CompletableFuture<String?>()
     service.takeScreenshot(Display.DEFAULT_DISPLAY, service.mainExecutor,
       object : AccessibilityService.TakeScreenshotCallback {
@@ -95,13 +98,7 @@ class ScreenReader(private val service: AccessibilityService) {
           if (hw == null) { future.complete(null); return }
           val soft = hw.copy(Bitmap.Config.ARGB_8888, false)
           hw.recycle()
-          val scale = maxWidth.toFloat() / soft.width
-          val scaled = if (scale < 1f)
-            Bitmap.createScaledBitmap(soft, maxWidth, (soft.height * scale).toInt(), true) else soft
-          val bytes = ByteArrayOutputStream().use { bos ->
-            scaled.compress(Bitmap.CompressFormat.JPEG, 60, bos); bos.toByteArray()
-          }
-          future.complete(Base64.encodeToString(bytes, Base64.NO_WRAP))
+          future.complete(encode(soft, maxWidth))
         }
         override fun onFailure(errorCode: Int) {
           Log.w("NextStepScreen", "takeScreenshot failed: code $errorCode")
@@ -111,13 +108,23 @@ class ScreenReader(private val service: AccessibilityService) {
     return runCatching { future.get(timeoutMs, TimeUnit.MILLISECONDS) }.getOrNull()
   }
 
+  private fun encode(bitmap: Bitmap, maxWidth: Int): String {
+    val scale = maxWidth.toFloat() / bitmap.width
+    val scaled = if (scale < 1f) Bitmap.createScaledBitmap(bitmap, maxWidth, (bitmap.height * scale).toInt(), true) else bitmap
+    val bytes = ByteArrayOutputStream().use { bos -> scaled.compress(Bitmap.CompressFormat.JPEG, 60, bos); bos.toByteArray() }
+    return Base64.encodeToString(bytes, Base64.NO_WRAP)
+  }
+
   /** Full physical screen size, including system bars, matching what takeScreenshot returns. */
   fun screenSize(): Pair<Int, Int> {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
       val b = service.getSystemService(WindowManager::class.java).maximumWindowMetrics.bounds
       return b.width() to b.height()
     }
-    val m = service.resources.displayMetrics
+    @Suppress("DEPRECATION")
+    val m = android.util.DisplayMetrics().also {
+      service.getSystemService(WindowManager::class.java).defaultDisplay.getRealMetrics(it)
+    }
     return m.widthPixels to m.heightPixels
   }
 
