@@ -79,8 +79,9 @@ def _task(task_id: str, user: str) -> TaskRecord:
     return task
 
 
-@app.get("/healthz")
-def healthz() -> dict[str, str]:
+@app.get("/health")
+@app.get("/healthz")  # local only: Cloud Run's front end reserves paths ending in "z"
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 

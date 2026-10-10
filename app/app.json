@@ -52,8 +52,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "apiBaseUrl": "http://10.0.2.2:8080",
-      "firebaseApiKey": ""
+      "apiBaseUrl": "https://nextstep-api-219408489635.asia-south1.run.app",
+      "firebaseApiKey": "AIzaSyDcuiVVAK-W7SLz6PnA582pdhjTxwjev_M"
     }
   }
 }

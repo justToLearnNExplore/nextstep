@@ -28,7 +28,7 @@ def test_task_flow_requires_consent(monkeypatch):
 
 
 def test_healthz():
-    assert TestClient(main.app).get("/healthz").json() == {"status": "ok"}
+    assert TestClient(main.app).get("/health").json() == {"status": "ok"}
 
 
 def test_medicine_read_endpoint(monkeypatch):

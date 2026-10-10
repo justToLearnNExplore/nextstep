@@ -9,5 +9,5 @@ PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project)}"
 
 npm --prefix "$ROOT/dashboard" ci
 npm --prefix "$ROOT/dashboard" run build
-(cd "$ROOT" && npx --yes firebase-tools deploy --only hosting --project "$PROJECT_ID")
+(cd "$ROOT" && npx --yes firebase-tools deploy --only hosting,firestore:rules --project "$PROJECT_ID")
 echo "Dashboard: https://$PROJECT_ID.web.app"

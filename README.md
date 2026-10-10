@@ -4,6 +4,8 @@
 
 **An AI operator for a senior's smartphone.** Team Northstar · Google Cloud AI Builder Cup 2026 (JAPAC) · Theme: *Sustainability & Social Impact*
 
+**Live:** family view and demo at https://nextstep-northstar.web.app (try [/demo](https://nextstep-northstar.web.app/demo)) · API on Cloud Run (`asia-south1`)
+
 An older adult taps the NextStep bubble at the top-right of their Android phone and says what they want, in English, Hindi or Kannada: *"Order one litre of milk on Blinkit."* NextStep shows and reads out a short plan, the user approves it once, and NextStep **does the task in the real apps**: it opens Blinkit, searches, picks the item, adds it to the cart, reads out the total, and asks one final "yes" before placing a cash-on-delivery order.
 
 It pauses only where a human must decide: passwords, OTPs, PINs, UPI approval and biometrics (the user does those privately), and irreversible steps like Send, Place order or Install (the user confirms first).
