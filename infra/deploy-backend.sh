@@ -14,8 +14,9 @@ SERVICE="${SERVICE:-nextstep-api}"
 # "paid" (default) uses the newest models, with the same fallbacks.
 MODEL_PROFILE="${MODEL_PROFILE:-paid}"
 if [ "$MODEL_PROFILE" = "free" ]; then
-  MODELS="NEXTSTEP_OPERATOR_MODEL=gemini-3.5-flash,NEXTSTEP_OPERATOR_FALLBACKS=gemini-3.8-flash,NEXTSTEP_REASONING_MODEL=gemini-3.6-flash,NEXTSTEP_REASONING_FALLBACKS=gemini-3.5-flash-lite,NEXTSTEP_FAST_MODEL=gemini-3.5-flash-lite,NEXTSTEP_FAST_FALLBACKS=gemini-3.6-flash"
+  MODELS="NEXTSTEP_OPERATOR_MODEL=gemini-3.5-flash,NEXTSTEP_OPERATOR_FALLBACKS=gemini-3.8-flash,NEXTSTEP_REASONING_MODEL=gemini-3.6-flash,NEXTSTEP_REASONING_FALLBACKS=gemini-3.5-flash-lite,NEXTSTEP_FAST_MODEL=gemma-4-26b-a4b-it,NEXTSTEP_FAST_FALLBACKS=gemini-3.5-flash-lite"
 else
+  # Paid: Flash-Lite for scam checks so message text is not used for training (Gemma on the API is free-tier only).
   MODELS="NEXTSTEP_OPERATOR_MODEL=gemini-3.8-flash,NEXTSTEP_REASONING_MODEL=gemini-3.8-flash,NEXTSTEP_FAST_MODEL=gemini-3.5-flash-lite"
 fi
 

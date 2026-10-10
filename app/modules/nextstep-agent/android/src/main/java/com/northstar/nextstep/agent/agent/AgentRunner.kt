@@ -84,7 +84,10 @@ class AgentRunner(
         return@execute
       }
       val steps = plan.optJSONArray("steps").strings()
-      val approved = ask(plan.getString("summary"), t("yesDoIt", "Yes, do it"), t("no", "No"), steps)
+      val summary = plan.getString("summary").let {
+        if (res.optBoolean("uses_saved_routine")) "${t("savedRoutine", "I've done this before, so it will be quick.")} $it" else it
+      }
+      val approved = ask(summary, t("yesDoIt", "Yes, do it"), t("no", "No"), steps)
       api.post("/v1/tasks/$id/consent", JSONObject().put("approved", approved))
       if (!approved) { say(t("okCancelled", "Okay, I won't do it."), finalMessage = true); return@execute }
 

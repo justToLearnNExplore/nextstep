@@ -35,6 +35,7 @@ class ActionExecutor(private val service: AccessibilityService) {
       "wait" -> { Thread.sleep(args.optLong("seconds", 1).coerceIn(0, 10) * 1000); ok() }
       "take_screenshot" -> ok()
       "open_play_store" -> openPlayStore(args.getString("package"))
+      "open_link" -> openLink(args.getString("url"))
       "go_home" -> global(AccessibilityService.GLOBAL_ACTION_HOME)
       else -> err("unsupported_action:$name")
     }
@@ -127,6 +128,14 @@ class ActionExecutor(private val service: AccessibilityService) {
     return ok().put("note", "user_must_tap_install")
   }
 
+  /** Allowlisted search deep links (checked by the server Guardian and again here). */
+  private fun openLink(url: String): JSONObject {
+    if (LINK_ALLOWLIST.none { url.startsWith(it) }) return err("link_not_allowed")
+    service.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    settle(2000)
+    return ok()
+  }
+
   private fun launcherApps(): List<Pair<String, String>> {
     val pm = service.packageManager
     val main = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
@@ -164,5 +173,13 @@ class ActionExecutor(private val service: AccessibilityService) {
   private fun settle(ms: Long = 700) = Thread.sleep(ms)
 
   private fun ok() = JSONObject().put("ok", true)
+
+  companion object {
+    val LINK_ALLOWLIST = listOf(
+      "https://www.youtube.com/results?search_query=",
+      "https://m.youtube.com/results?search_query=",
+      "https://blinkit.com/s/?q=",
+    )
+  }
   private fun err(e: String) = JSONObject().put("ok", false).put("error", e)
 }

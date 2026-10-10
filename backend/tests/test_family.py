@@ -57,14 +57,14 @@ def test_task_confirmations_and_private_steps_reach_family(client, monkeypatch):
         StepResponse(done=True, message="Order placed"),
     ])
 
-    async def fake_next(task, screen, results):
+    async def fake_next(task, screen, hint=None):
         res = next(turns)
         if res.done:
             task.status = "done"
         return res
 
     monkeypatch.setattr(main, "plan_task", fake_plan)
-    monkeypatch.setattr(main, "next_actions", fake_next)
+    monkeypatch.setattr(main.agent_loop, "next_actions", fake_next)
 
     tid = client.post("/v1/tasks", json={"goal": "Order milk on Blinkit", "screen": SCREEN}, headers=SENIOR).json()["task_id"]
     client.post(f"/v1/tasks/{tid}/consent", json={"approved": True}, headers=SENIOR)

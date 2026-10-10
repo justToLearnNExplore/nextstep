@@ -37,6 +37,13 @@ SECRET = re.compile(
     re.I,
 )
 URL = re.compile(r"(https?://\S+|\b[\w-]+\.(?:com|in|net|org|co|xyz|top|info|link|ly|me)\S*)", re.I)
+# Deep links NextStep may open directly (search pages only).
+ALLOWED_LINK_PREFIXES = (
+    "https://www.youtube.com/results?search_query=",
+    "https://m.youtube.com/results?search_query=",
+    "https://blinkit.com/s/?q=",
+)
+
 DIGITS_ONLY = re.compile(r"^\s*\d{4,8}\s*$")
 
 
@@ -73,6 +80,9 @@ def classify(
         app = str(args.get("app_name") or args.get("package", ""))
         escalate(Gate.CONFIRM, "install_app", phrase(language, "install", app=app))
         action.yes_label = phrase(language, "yes_go")
+
+    if name == "open_link" and not str(args.get("url", "")).startswith(ALLOWED_LINK_PREFIXES):
+        escalate(Gate.BLOCKED, "link_not_allowlisted", phrase(language, "blocked_link"))
 
     if name == "hand_over_to_user":
         escalate(Gate.PRIVATE, "user_only_step", str(args.get("reason") or phrase(language, "private")))

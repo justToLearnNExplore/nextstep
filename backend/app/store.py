@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 
 from .config import settings
 from .protocol import TaskPlan
+from .skills import Skill, SkillStep
 
 Status = Literal["planned", "running", "declined", "stopped", "done", "failed"]
 Severity = Literal["routine", "confirmed", "declined", "private", "alert", "done", "failed"]
@@ -29,8 +30,22 @@ class TaskRecord(BaseModel):
     turns: int = 0
     created_at: float = Field(default_factory=time.time)
     log: list[dict[str, Any]] = Field(default_factory=list)
-    # call_id → {name, intent, gate} of actions sent to the phone, to interpret their results.
-    pending: dict[str, dict[str, str]] = Field(default_factory=dict)
+    # call_id → action sent to the phone (name, intent, gate, args, recipe step), to interpret results.
+    pending: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # One line per completed step; the stateless operator's memory (no screenshots kept).
+    history: list[str] = Field(default_factory=list)
+    # Successful actions in order, coordinate-free, to learn a skill from.
+    trace: list[SkillStep] = Field(default_factory=list)
+    skill_id: str | None = None  # skill being replayed
+    replay_index: int = 0
+    last_failed: bool = False
+    # Cost/efficiency telemetry (shown to judges and in the action log).
+    ai_calls: int = 0
+    skill_steps: int = 0
+    rule_steps: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_tokens: int = 0
 
     def add_log(self, kind: str, **data: Any) -> None:
         self.log.append({"at": time.time(), "kind": kind, **data})
@@ -93,6 +108,8 @@ class Store(Protocol):
     def put_viewer(self, v: Viewer) -> None: ...
     def get_viewer(self, token_hash: str) -> Viewer | None: ...
     def list_viewers(self, uid: str) -> list[Viewer]: ...
+    def get_skill(self, doc_id: str) -> Skill | None: ...
+    def put_skill(self, skill: Skill) -> None: ...
 
 
 class MemoryStore:
@@ -102,6 +119,13 @@ class MemoryStore:
         self._events: dict[str, list[FamilyEvent]] = {}
         self._invites: dict[str, Invite] = {}
         self._viewers: dict[str, Viewer] = {}
+        self._skills: dict[str, Skill] = {}
+
+    def get_skill(self, doc_id: str) -> Skill | None:
+        return self._skills.get(doc_id)
+
+    def put_skill(self, skill: Skill) -> None:
+        self._skills[skill.doc_id] = skill
 
     def get(self, task_id: str) -> TaskRecord | None:
         return self._tasks.get(task_id)
@@ -138,13 +162,21 @@ class MemoryStore:
 
 
 class FirestoreStore:
-    """users/{uid} profile · users/{uid}/events/{id} · tasks/{id} · invites/{code} · viewers/{hash}"""
+    """users/{uid} profile · users/{uid}/events/{id} · tasks/{id} · invites/{code} · viewers/{hash}
+    · skills/{uid}__{key} (learned recipes; no screenshots or personal content)"""
 
     def __init__(self) -> None:
         from google.cloud import firestore
 
         self._fs = firestore
         self._db = firestore.Client(project=settings.project)
+
+    def get_skill(self, doc_id: str) -> Skill | None:
+        snap = self._db.collection("skills").document(doc_id).get()
+        return Skill.model_validate(snap.to_dict()) if snap.exists else None
+
+    def put_skill(self, skill: Skill) -> None:
+        self._db.collection("skills").document(skill.doc_id).set(skill.model_dump(mode="json"))
 
     def get(self, task_id: str) -> TaskRecord | None:
         snap = self._db.collection("tasks").document(task_id).get()
