@@ -11,14 +11,13 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from . import family
+from . import agent_loop, family
 from .agents.explainer import explain_screen
 from .agents.medicine_reader import read_medicine
 from .agents.planner import plan_task
 from .agents.scam_shield import check_message
 from .auth import current_user
 from .config import settings
-from .operator import next_actions
 from .resilience import AIUnavailable
 from .stt import transcribe
 from .protocol import (
@@ -139,9 +138,11 @@ def get_me(uid: str = Depends(senior)) -> ProfileResponse:
 async def start_task(req: StartTaskRequest, user: str = Depends(senior)) -> StartTaskResponse:
     plan = await within(settings.agent_budget_s, plan_task(req.goal, req.language, req.screen))
     task = TaskRecord(user_id=user, goal=req.goal, language=req.language, plan=plan)
-    task.add_log("plan", summary=plan.summary, steps=plan.steps, refused=plan.refused)
+    skill = agent_loop.attach_skill(store, task)
+    task.add_log("plan", summary=plan.summary, steps=plan.steps, refused=plan.refused,
+                 skill_key=plan.skill_key, saved_routine=bool(skill))
     store.put(task)
-    return StartTaskResponse(task_id=task.id, plan=plan)
+    return StartTaskResponse(task_id=task.id, plan=plan, uses_saved_routine=bool(skill))
 
 
 @app.post("/v1/tasks/{task_id}/consent")
@@ -166,19 +167,24 @@ async def step(task_id: str, req: StepRequest, user: str = Depends(senior)) -> S
     results = [r.model_dump() for r in req.results]
     for r in results:
         task.add_log("result", name=r["name"], call_id=r["call_id"], result=r["result"])
-    family.on_results(store, task, results)
+    agent_loop.absorb_results(task, results)  # history + learning trace (reads pending)
+    family.on_results(store, task, results)  # timeline: yes / no / private (consumes pending)
 
-    if task.turns >= settings.max_turns:
+    if task.turns + task.skill_steps + task.rule_steps >= settings.max_turns:
         task.status = "failed"
         res = StepResponse(done=True, message="")
     else:
-        res = await within(settings.step_budget_s, next_actions(task, req.screen, results))
+        res = await within(settings.step_budget_s, agent_loop.decide(store, task, req.screen))
     for a in res.actions:
-        task.add_log("action", name=a.name, intent=a.intent, gate=a.gate.value, reason=a.reason)
-    family.on_actions(task, res.actions)
+        task.add_log("action", name=a.name, intent=a.intent, gate=a.gate.value, reason=a.reason, source=res.source)
     if res.done:
-        task.add_log("done", message=res.message)
-        family.on_finished(store, task, res.message)
+        if res.source == "skill":
+            task.status = "done"  # the whole recipe ran
+        success = task.status == "done"
+        agent_loop.finish(store, task, success)
+        task.add_log("done", message=res.message, ai_calls=task.ai_calls, skill_steps=task.skill_steps,
+                     rule_steps=task.rule_steps, input_tokens=task.input_tokens, output_tokens=task.output_tokens)
+        family.on_finished(store, task, " ".join(x for x in (res.message, agent_loop.efficiency_note(task)) if x))
     store.put(task)
     return res
 

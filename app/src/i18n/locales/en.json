@@ -120,6 +120,7 @@
   "aiQuota": "My thinking service has reached today's limit. Please try again later. Nothing was ordered or sent.",
   "micSilent": "I can't hear the microphone at all. Please check that it is switched on.",
   "micUnavailable": "The microphone is not available. Please allow NextStep to use it in Settings.",
+  "savedRoutine": "I've done this before, so it will be quick.",
   "namePrefixes": [
     "my name is",
     "my name's",

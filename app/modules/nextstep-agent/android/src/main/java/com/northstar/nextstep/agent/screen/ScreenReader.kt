@@ -82,7 +82,9 @@ class ScreenReader(private val service: AccessibilityService) {
    * Screenshot via AccessibilityService.takeScreenshot (Android 11+). Downscaled JPEG to keep
    * request size and latency low; Gemini works in normalized 0-999 coordinates anyway.
    */
-  fun screenshot(maxWidth: Int = 720, timeoutMs: Long = 2500): String? {
+  // 540 px wide is plenty for the model (it reads exact labels from the element list) and
+  // roughly halves image tokens compared with 720 px.
+  fun screenshot(maxWidth: Int = 540, timeoutMs: Long = 2500): String? {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
     val future = CompletableFuture<String?>()
     service.takeScreenshot(Display.DEFAULT_DISPLAY, service.mainExecutor,
@@ -97,7 +99,7 @@ class ScreenReader(private val service: AccessibilityService) {
           val scaled = if (scale < 1f)
             Bitmap.createScaledBitmap(soft, maxWidth, (soft.height * scale).toInt(), true) else soft
           val bytes = ByteArrayOutputStream().use { bos ->
-            scaled.compress(Bitmap.CompressFormat.JPEG, 70, bos); bos.toByteArray()
+            scaled.compress(Bitmap.CompressFormat.JPEG, 60, bos); bos.toByteArray()
           }
           future.complete(Base64.encodeToString(bytes, Base64.NO_WRAP))
         }

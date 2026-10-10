@@ -64,14 +64,36 @@ class Screen(BaseModel):
                 hits.append(n)
         return hits
 
-    def summary(self, limit: int = 120) -> str:
-        """Compact text form of the tree for the model (complements the screenshot)."""
-        lines = [f"app={self.package} size={self.width}x{self.height}"]
-        for n in self.nodes[:limit]:
-            flags = "".join(f for f, on in (("C", n.click), ("E", n.edit), ("S", n.scroll), ("F", n.focus)) if on)
-            label = "<secure field>" if n.secure else n.label()
-            lines.append(f"[{n.i}] {n.cls or ''} {flags} '{label[:80]}' {n.b}")
+    def summary(self, limit: int = 80) -> str:
+        """Compact text form of the screen for the model: only elements a person could read or
+        tap, short labels, bounds normalised to 0-999 (same space as Computer Use clicks)."""
+        lines = [f"app={self.package}"]
+        seen: set[str] = set()
+        for n in self.nodes:
+            if len(lines) > limit:
+                break
+            label = "<secure field>" if n.secure else n.label()[:50]
+            if not (label or n.click or n.edit):
+                continue
+            box = self.norm_box(n)
+            key = f"{label}|{box[:2]}"
+            if key in seen:  # nested containers often repeat the same label
+                continue
+            seen.add(key)
+            flags = "".join(f for f, on in (("tap", n.click), ("input", n.edit), ("scroll", n.scroll)) if on)
+            lines.append(f"- '{label}' {flags} @{box[0]},{box[1]}")
         return "\n".join(lines)
+
+    def norm_box(self, n: UiNode) -> tuple[int, int]:
+        """Centre of a node in Computer Use's 0-999 coordinate space."""
+        if len(n.b) != 4 or not self.width or not self.height:
+            return (0, 0)
+        cx = (n.b[0] + n.b[2]) / 2 * 1000 / self.width
+        cy = (n.b[1] + n.b[3]) / 2 * 1000 / self.height
+        return (min(999, int(cx)), min(999, int(cy)))
+
+    def text_chars(self) -> int:
+        return sum(len(n.label()) for n in self.nodes if not n.secure)
 
 
 # ---- tasks -------------------------------------------------------------------------------
@@ -92,6 +114,17 @@ class TaskPlan(BaseModel):
     target_package: str | None = Field(default=None, description="Android package of the target app if known.")
     sensitive_steps: list[str] = Field(default_factory=list, description="Steps where NextStep will stop and ask (send, order, install, payment).")
     refused: bool = Field(default=False, description="True if the request is unsafe or impossible.")
+    skill_key: str | None = Field(
+        default=None,
+        description="Stable snake_case id for this KIND of task, independent of item/person, e.g. 'blinkit_order_item', 'youtube_play_search', 'whatsapp_call_contact'.",
+    )
+    params: dict[str, str] = Field(
+        default_factory=dict, description="The variable parts, e.g. {'item': 'milk 1 litre'} or {'query': 'devotional songs'}."
+    )
+    deep_link: str | None = Field(
+        default=None,
+        description="Optional https link that jumps straight to the right screen, only from: youtube.com/results?search_query=..., blinkit.com/s/?q=...",
+    )
     special_flow: Literal["medicine_photo"] | None = Field(
         default=None, description="'medicine_photo' when the user wants to photograph a medicine/prescription and share it."
     )
@@ -125,6 +158,7 @@ class MedicineInfo(BaseModel):
 class StartTaskResponse(BaseModel):
     task_id: str
     plan: TaskPlan
+    uses_saved_routine: bool = False
 
 
 class ConsentRequest(BaseModel):
@@ -155,6 +189,7 @@ class GatedAction(BaseModel):
 
 class StepResponse(BaseModel):
     actions: list[GatedAction] = Field(default_factory=list)
+    source: Literal["ai", "skill", "rule", "none"] = "none"
     done: bool = False
     message: str = ""
     status_text: str = ""

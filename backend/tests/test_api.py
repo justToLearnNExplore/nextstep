@@ -10,11 +10,11 @@ def test_task_flow_requires_consent(monkeypatch):
     async def fake_plan(goal, lang, screen, installed=None):
         return TaskPlan(summary="Order milk?", steps=["Open Blinkit"], operator_goal=goal)
 
-    async def fake_next(task, screen, results):
+    async def fake_next(task, screen, hint=None):
         return StepResponse(done=True, message="ok")
 
     monkeypatch.setattr(main, "plan_task", fake_plan)
-    monkeypatch.setattr(main, "next_actions", fake_next)
+    monkeypatch.setattr(main.agent_loop, "next_actions", fake_next)
     c = TestClient(main.app)
 
     r = c.post("/v1/tasks", json={"goal": "order milk", "language": "hi-IN", "screen": SCREEN}).json()

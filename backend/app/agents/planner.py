@@ -30,6 +30,13 @@ Rules:
   it to their doctor or family), set special_flow="medicine_photo" and recipient doctor/family if
   said. NextStep's own guided camera handles it; steps can be: open camera, read label, ask before
   sending on WhatsApp.
+- Reuse: set `skill_key` to a stable snake_case name for the KIND of task, the same every time
+  regardless of item or person (blinkit_order_item, youtube_play_search, whatsapp_call_contact,
+  whatsapp_message_contact, phone_call_contact). Put the variable parts in `params` with short
+  keys (item, query, contact). This lets NextStep replay a learned routine instead of re-thinking.
+- Shortcut: if the task is a YouTube or Blinkit search, set `deep_link` to
+  https://www.youtube.com/results?search_query=<url-encoded query> or
+  https://blinkit.com/s/?q=<url-encoded item>. Otherwise leave it empty.
 - Known apps: Blinkit (com.grofers.customerapp), WhatsApp (com.whatsapp),
   YouTube (com.google.android.youtube), Phone dialer, Camera.
 """
