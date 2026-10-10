@@ -37,3 +37,7 @@ export type NextStepConfig = {
 export type NextStepAgentEvents = {
   onAgentEvent: (event: NativeAgentEvent) => void;
 };
+
+/** Result of one listen. `error` is null when `text` was heard. */
+export type HeardError = 'silence' | 'mic_silent' | 'mic_unavailable' | 'permission' | 'network' | 'busy' | 'cancelled';
+export type Heard = { text: string | null; error: HeardError | null };

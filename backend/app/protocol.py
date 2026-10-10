@@ -252,3 +252,16 @@ class FeedResponse(BaseModel):
 class ClientEvent(BaseModel):
     kind: str
     data: dict[str, Any] = Field(default_factory=dict)
+
+
+# ---- speech -------------------------------------------------------------------------------
+
+
+class SttRequest(BaseModel):
+    language: str = "en-IN"
+    audio_b64: str = Field(description="Mono 16-bit little-endian PCM (LINEAR16).")
+    sample_rate: int = 16000
+
+
+class SttResponse(BaseModel):
+    text: str

@@ -1,9 +1,28 @@
 import Constants from 'expo-constants';
 import { useEffect, useSyncExternalStore } from 'react';
 
-import NextStepAgent, { type AgentLogEntry, type NextStepConfig } from '../../modules/nextstep-agent';
+import NextStepAgent, { type AgentLogEntry, type Heard, type NextStepConfig } from '../../modules/nextstep-agent';
+
+import type { StringKey } from '../i18n';
 
 export { NextStepAgent };
+
+/** The sentence to show/speak when listening didn't produce text. */
+export function heardErrorKey(error: Heard['error']): StringKey {
+  switch (error) {
+    case 'mic_silent':
+      return 'micSilent';
+    case 'mic_unavailable':
+    case 'permission':
+      return 'micUnavailable';
+    case 'network':
+      return 'networkError';
+    case 'busy':
+      return 'aiBusy';
+    default:
+      return 'didNotHear';
+  }
+}
 
 export const API_BASE_URL: string =
   (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ?? 'http://10.0.2.2:8080';

@@ -65,6 +65,7 @@ class BubbleOverlay(
   private var stopPill: TextView? = null
   private var popup: View? = null
   private var panel: View? = null
+  private var panelToken = 0
   private var busy = false
 
   // ---- lifecycle -------------------------------------------------------------------------
@@ -204,10 +205,14 @@ class BubbleOverlay(
    * Bottom panel used for plans, confirmations, private-step hand-offs, explanations and scam
    * warnings. A Stop button is always appended while a task is active.
    */
-  fun showPanel(message: String, buttons: List<PanelButton>, tone: Style? = null, steps: List<String> = emptyList()) =
+  fun showPanel(
+    message: String, buttons: List<PanelButton>, tone: Style? = null, steps: List<String> = emptyList(),
+    autoHideMs: Long? = null,
+  ) =
     main.post {
       closePopupNow()
       panel?.let { runCatching { wm.removeView(it) } }
+      val token = ++panelToken
       val card = card(fill = if (tone == Style.STOP) Palette.AMBER else Palette.PAPER).apply {
         addView(TextView(service).apply {
           text = message
@@ -231,6 +236,8 @@ class BubbleOverlay(
       wm.addView(card, params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, x = 0, y = dp(24),
         width = service.resources.displayMetrics.widthPixels - dp(24)))
       panel = card
+      // Only hide if no newer panel replaced this one in the meantime.
+      autoHideMs?.let { ms -> main.postDelayed({ if (panelToken == token) hidePanel() }, ms) }
     }
 
   fun hidePanel() = main.post {

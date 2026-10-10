@@ -19,6 +19,9 @@ class Settings:
     # Per-call timeouts (ms): fail fast and fall back instead of leaving a senior waiting.
     operator_timeout_ms: int = int(os.getenv("NEXTSTEP_OPERATOR_TIMEOUT_MS", "45000"))
     agent_timeout_ms: int = int(os.getenv("NEXTSTEP_AGENT_TIMEOUT_MS", "30000"))
+    # Whole-request budgets (s). Must stay below the phone's read timeout (90 s) and Cloud Run's 120 s.
+    step_budget_s: float = float(os.getenv("NEXTSTEP_STEP_BUDGET_S", "75"))
+    agent_budget_s: float = float(os.getenv("NEXTSTEP_AGENT_BUDGET_S", "50"))
     store: str = os.getenv("NEXTSTEP_STORE", "memory")
     project: str | None = os.getenv("GOOGLE_CLOUD_PROJECT") or None
     require_auth: bool = os.getenv("NEXTSTEP_REQUIRE_AUTH", "false").lower() == "true"

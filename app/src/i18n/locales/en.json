@@ -116,6 +116,10 @@
   "stopSharing": "Stop sharing",
   "sharingStopped": "Sharing stopped. Nobody can see your activity now.",
   "networkError": "Couldn't reach NextStep. Check the internet and try again.",
+  "aiBusy": "My thinking service is busy right now. Please try again in a minute. Nothing was ordered or sent.",
+  "aiQuota": "My thinking service has reached today's limit. Please try again later. Nothing was ordered or sent.",
+  "micSilent": "I can't hear the microphone at all. Please check that it is switched on.",
+  "micUnavailable": "The microphone is not available. Please allow NextStep to use it in Settings.",
   "namePrefixes": [
     "my name is",
     "my name's",

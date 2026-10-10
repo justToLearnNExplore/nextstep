@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useI18n } from '../i18n';
-import { NextStepAgent } from '../lib/agent';
+import { heardErrorKey, NextStepAgent } from '../lib/agent';
 import { put } from '../lib/api';
 import { createAccount, extractName } from '../lib/identity';
 import { colors, fonts, size } from '../theme';
@@ -37,12 +37,13 @@ export function NameCapture({ initial, onDone }: { initial?: string; onDone: (na
     Speech.stop();
     setError(null);
     setPhase('listening');
-    const heard = await NextStepAgent.listenOnce(lang.tag).catch(() => null);
-    const n = heard ? extractName(heard, lang.strings.namePrefixes, lang.strings.nameSuffixes) : '';
+    const heard = await NextStepAgent.listenOnce(lang.tag).catch(() => ({ text: null, error: 'network' as const }));
+    const n = heard.text ? extractName(heard.text, lang.strings.namePrefixes, lang.strings.nameSuffixes) : '';
     if (!n) {
+      const msg = t(heardErrorKey(heard.error));
       setPhase('ask');
-      setError(t('didNotHear'));
-      say(t('didNotHear'));
+      setError(msg);
+      say(msg);
       return;
     }
     setName(n);

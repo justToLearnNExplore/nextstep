@@ -19,6 +19,8 @@ import com.northstar.nextstep.agent.safety.maxOf
 import com.northstar.nextstep.agent.screen.ScreenReader
 import com.northstar.nextstep.agent.voice.VoiceIO
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
+import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.CompletableFuture
@@ -64,7 +66,7 @@ class AgentRunner(
       overlay.showPanel(t("thinking", "Let me think about that…"), emptyList())
       val screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
       val res = api.post("/v1/tasks", JSONObject()
-        .put("goal", goal).put("language", lang).put("screen", screen.toJson()))
+        .put("goal", goal).put("language", lang).put("screen", screen.toJson()), timeoutMs = SLOW_CALL_MS)
       val id = res.getString("task_id")
       taskId = id
       log("plan", res)
@@ -88,12 +90,24 @@ class AgentRunner(
 
       loop(id)
     } catch (e: Exception) {
+      Log.e(TAG, "task failed: $goal", e)
       log("error", JSONObject().put("message", e.message))
-      say(t("somethingWrong", "Sorry, something went wrong. I have stopped."), finalMessage = true)
+      say(explain(e), finalMessage = true)
     } finally {
       taskId = null
       overlay.setBusy(false)
     }
+  }
+
+  /** Turns a failure into a calm sentence the user can act on (never "error 503"). */
+  private fun explain(e: Exception): String = when {
+    e is BackendError && e.code == 503 && e.message?.contains("ai_quota") == true ->
+      t("aiQuota", "My thinking service has reached today's limit. Please try again later. Nothing was ordered or sent.")
+    e is BackendError && e.code == 503 ->
+      t("aiBusy", "My thinking service is busy right now. Please try again in a minute. Nothing was ordered or sent.")
+    e is IOException ->
+      t("networkError", "I couldn't reach the internet. Please check it and try again.")
+    else -> t("somethingWrong", "Sorry, something went wrong. I have stopped.")
   }
 
   private fun loop(id: String) {
@@ -102,7 +116,7 @@ class AgentRunner(
       if (stopped.get()) return
       val screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
       val res = api.post("/v1/tasks/$id/step", JSONObject()
-        .put("screen", screen.toJson()).put("results", results))
+        .put("screen", screen.toJson()).put("results", results), timeoutMs = SLOW_CALL_MS)
       log("step", res)
       res.optString("status_text").takeIf { it.isNotBlank() }?.let {
         overlay.showPanel(it, emptyList(), steps = res.optJSONArray("done_steps").strings())
@@ -174,7 +188,7 @@ class AgentRunner(
     try {
       overlay.showPanel(t("looking", "Let me look at this screen…"), emptyList())
       val screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
-      val res = api.post("/v1/screen/explain", JSONObject().put("language", lang).put("screen", screen.toJson()))
+      val res = api.post("/v1/screen/explain", JSONObject().put("language", lang).put("screen", screen.toJson()), timeoutMs = SLOW_CALL_MS)
       log("explain", res)
       val buttons = res.optJSONArray("options").objects().map { o ->
         val id = o.getString("id")
@@ -193,7 +207,8 @@ class AgentRunner(
       overlay.showPanel(res.getString("explanation"), buttons, tone)
       voice.speak(res.getString("explanation"), lang)
     } catch (e: Exception) {
-      say(t("somethingWrong", "Sorry, something went wrong."), finalMessage = true)
+      Log.e(TAG, "understandScreen failed", e)
+      say(explain(e), finalMessage = true)
     }
   }
 
@@ -214,7 +229,7 @@ class AgentRunner(
       buttons += PanelButton(t("ok", "OK"), Style.PRIMARY) { overlay.hidePanel() }
       overlay.showPanel(res.getString("warning"), buttons, Style.STOP)
       voice.speak(res.getString("warning"), lang)
-    }
+    }.onFailure { Log.e(TAG, "scam check failed", it) }
   }
 
   fun openQuickApp(key: String) = worker.execute {
@@ -225,7 +240,7 @@ class AgentRunner(
       "youtube" -> service.packageManager.getLaunchIntentForPackage("com.google.android.youtube")
       else -> null
     }
-    if (intent == null) { say(t("appMissing", "That app is not installed.")); return@execute }
+    if (intent == null) { say(t("appMissing", "That app is not installed."), finalMessage = true); return@execute }
     service.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     log("open_app", JSONObject().put("app", key))
   }
@@ -277,8 +292,9 @@ class AgentRunner(
       if (sent) api.postQuietly("/v1/events", JSONObject().put("kind", "share_sent").put("data", JSONObject().put("recipient", recipient)))
       say(if (sent) t("photoSent", "Sent.") else t("pickChatYourself", "Please tap Send yourself."), finalMessage = true)
     } catch (e: Exception) {
+      Log.e(TAG, "share failed", e)
       log("error", JSONObject().put("message", e.message))
-      say(t("somethingWrong", "Sorry, something went wrong. I have stopped."), finalMessage = true)
+      say(explain(e), finalMessage = true)
     } finally {
       overlay.setBusy(false)
     }
@@ -313,7 +329,7 @@ class AgentRunner(
     ), steps = steps)
     voice.speakAndWait((listOf(message) + steps).joinToString(". "), lang)
     if (!compact && !decision.isDone) {
-      voice.listen(lang) { heard -> heard?.let { yesNo(it) }?.let { decision.complete(it) } }
+      voice.listen(lang) { heard -> heard.text?.let { yesNo(it) }?.let { decision.complete(it) } }
     }
     val answer = runCatching { decision.get() }.getOrDefault(false)
     voice.cancelListening()
@@ -334,10 +350,14 @@ class AgentRunner(
     }
   }
 
+  /**
+   * Shows and speaks a message. Every message has an OK button; informational ones also close
+   * themselves a few seconds after being spoken, so nothing is ever left stuck on screen.
+   */
   private fun say(message: String, finalMessage: Boolean = false) {
     if (message.isBlank()) return
-    overlay.showPanel(message,
-      if (finalMessage) listOf(PanelButton(t("ok", "OK"), Style.PRIMARY) { overlay.hidePanel() }) else emptyList())
+    overlay.showPanel(message, listOf(PanelButton(t("ok", "OK"), Style.PRIMARY) { overlay.hidePanel() }),
+      autoHideMs = if (finalMessage) null else 6_000L)
     voice.speakAndWait(message, lang)
   }
 
@@ -347,5 +367,10 @@ class AgentRunner(
   private fun JSONArray?.strings() = if (this == null) emptyList() else (0 until length()).map { getString(it) }
   private fun JSONArray?.objects() = if (this == null) emptyList() else (0 until length()).map { getJSONObject(it) }
 
-  companion object { const val MAX_TURNS = 40 }
+  companion object {
+    const val MAX_TURNS = 40
+    private const val TAG = "NextStepAgent"
+    /** Planning and operator steps; the server answers within its 75 s budget. */
+    private const val SLOW_CALL_MS = 90_000
+  }
 }
