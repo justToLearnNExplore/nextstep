@@ -16,6 +16,7 @@ google-api-core==2.34.0
 google-auth==2.61.0
 google-cloud-core==2.8.0
 google-cloud-firestore==2.34.1
+google-cloud-speech==2.41.0
 google-genai==2.29.0
 googleapis-common-protos==1.75.5
 graphviz==0.21
@@ -24,6 +25,7 @@ grpcio-status==1.84.0
 h11==0.16.0
 httpcore==1.0.9
 httptools==0.8.0
+httpx==0.28.1
 idna==3.20
 joserfc==1.7.5
 jsonschema==4.26.0

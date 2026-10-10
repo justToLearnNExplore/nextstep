@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Build
 import android.util.Base64
+import android.util.Log
 import android.view.Display
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityNodeInfo
@@ -100,7 +101,10 @@ class ScreenReader(private val service: AccessibilityService) {
           }
           future.complete(Base64.encodeToString(bytes, Base64.NO_WRAP))
         }
-        override fun onFailure(errorCode: Int) { future.complete(null) }
+        override fun onFailure(errorCode: Int) {
+          Log.w("NextStepScreen", "takeScreenshot failed: code $errorCode")
+          future.complete(null)
+        }
       })
     return runCatching { future.get(timeoutMs, TimeUnit.MILLISECONDS) }.getOrNull()
   }

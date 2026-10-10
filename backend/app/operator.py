@@ -15,7 +15,7 @@ from .config import settings
 from .guardian import classify
 from .i18n import language
 from .protocol import GatedAction, Screen, StepResponse
-from .resilience import first_working, retry
+from .resilience import AIUnavailable, first_working, quota_exhausted, retry
 from .store import TaskRecord
 
 _client: genai.Client | None = None
@@ -137,17 +137,22 @@ async def next_actions(task: TaskRecord, screen: Screen, results: list[dict[str,
         if not model_input:  # nothing ran (e.g. user declined): just show the current screen
             model_input = [{"type": "text", "text": f"Current screen:\n{screen.summary()}"}, *_image(screen)]
         model = task.operator_model or settings.operator_model
-        interaction = await retry(
-            lambda: client().aio.interactions.create(
-                model=model,
-                previous_interaction_id=task.interaction_id,
-                system_instruction=system_instruction(task),
-                input=model_input,
-                tools=_tools(),
-            ),
-            attempts=3,
-            what="operator",
-        )
+        try:
+            interaction = await retry(
+                lambda: client().aio.interactions.create(
+                    model=model,
+                    previous_interaction_id=task.interaction_id,
+                    system_instruction=system_instruction(task),
+                    input=model_input,
+                    tools=_tools(),
+                ),
+                attempts=3,
+                what="operator",
+            )
+        except Exception as e:
+            if quota_exhausted(e):
+                raise AIUnavailable("quota", 3600) from e
+            raise
 
     task.interaction_id = interaction.id
     task.turns += 1

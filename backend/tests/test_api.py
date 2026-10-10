@@ -46,3 +46,38 @@ def test_medicine_read_endpoint(monkeypatch):
 def test_planner_schema_supports_medicine_flow():
     plan = TaskPlan(summary="s", steps=[], operator_goal="g", special_flow="medicine_photo", recipient="doctor")
     assert plan.model_dump()["special_flow"] == "medicine_photo"
+
+
+def test_ai_unavailable_becomes_503_with_code(monkeypatch):
+    from app.resilience import AIUnavailable
+
+    async def no_quota(goal, lang, screen, installed=None):
+        raise AIUnavailable("quota", 3600)
+
+    monkeypatch.setattr(main, "plan_task", no_quota)
+    r = TestClient(main.app).post("/v1/tasks", json={"goal": "order milk", "screen": SCREEN})
+    assert r.status_code == 503 and r.json()["detail"] == {"code": "ai_quota", "retry_after": 3600}
+
+
+def test_slow_model_becomes_busy_not_a_hang(monkeypatch):
+    import asyncio
+
+    async def slow(goal, lang, screen, installed=None):
+        await asyncio.sleep(5)
+
+    import dataclasses
+
+    monkeypatch.setattr(main, "settings", dataclasses.replace(main.settings, agent_budget_s=0.05))
+    monkeypatch.setattr(main, "plan_task", slow)
+    r = TestClient(main.app).post("/v1/tasks", json={"goal": "order milk", "screen": SCREEN})
+    assert r.status_code == 503 and r.json()["detail"]["code"] == "ai_busy"
+
+
+def test_stt_endpoint(monkeypatch):
+    async def fake(audio_b64, lang, rate):
+        assert lang == "kn-IN" and rate == 16000
+        return "ಹಾಲು ಆರ್ಡರ್ ಮಾಡು"
+
+    monkeypatch.setattr(main, "transcribe", fake)
+    r = TestClient(main.app).post("/v1/stt", json={"language": "kn-IN", "audio_b64": "AAAA"})
+    assert r.json() == {"text": "ಹಾಲು ಆರ್ಡರ್ ಮಾಡು"}

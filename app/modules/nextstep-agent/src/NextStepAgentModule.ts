@@ -1,6 +1,6 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import type { NextStepAgentEvents, NextStepConfig } from './NextStepAgent.types';
+import type { Heard, NextStepAgentEvents, NextStepConfig } from './NextStepAgent.types';
 
 declare class NextStepAgentModule extends NativeModule<NextStepAgentEvents> {
   isAccessibilityEnabled(): boolean;
@@ -17,7 +17,7 @@ declare class NextStepAgentModule extends NativeModule<NextStepAgentEvents> {
   shareImageToWhatsApp(path: string, phone: string | null, caption: string, recipientName: string): void;
   isAppInstalled(packageName: string): boolean;
   minimizeApp(): void;
-  listenOnce(language: string): Promise<string | null>;
+  listenOnce(language: string): Promise<Heard>;
   cancelListening(): void;
 }
 

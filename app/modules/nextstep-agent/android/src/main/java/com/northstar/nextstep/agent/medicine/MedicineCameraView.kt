@@ -2,6 +2,7 @@ package com.northstar.nextstep.agent.medicine
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
@@ -41,6 +42,7 @@ class MedicineCameraView(context: Context, appContext: AppContext) : ExpoView(co
   }
   private val analysisExecutor: ExecutorService = Executors.newSingleThreadExecutor()
   private val analyzer = LabelAnalyzer { state, m, text ->
+    Log.d(TAG, "guidance=$state brightness=${m.brightness.toInt()} sharp=${m.sharpness.toInt()} motion=${m.motion.toInt()} chars=${m.textChars} line=${"%.3f".format(m.lineHeight)}")
     post {
       onGuidance(mapOf(
         "state" to state,
@@ -72,6 +74,7 @@ class MedicineCameraView(context: Context, appContext: AppContext) : ExpoView(co
 
   private fun bind() {
     val owner = appContext.currentActivity as? LifecycleOwner ?: run {
+      Log.e(TAG, "camera bind: activity is not a LifecycleOwner")
       onCameraError(mapOf("message" to "no_lifecycle_owner")); return
     }
     val future = ProcessCameraProvider.getInstance(context)
@@ -94,7 +97,11 @@ class MedicineCameraView(context: Context, appContext: AppContext) : ExpoView(co
         camera = p.bindToLifecycle(owner, CameraSelector.DEFAULT_BACK_CAMERA, pv, analysis, cap)
         capture = cap
         provider = p
-      }.onFailure { onCameraError(mapOf("message" to (it.message ?: "bind_failed"))) }
+        Log.i(TAG, "camera bound (back camera)")
+      }.onFailure {
+        Log.e(TAG, "camera bind failed", it)
+        onCameraError(mapOf("message" to (it.message ?: "bind_failed")))
+      }
     }, ContextCompat.getMainExecutor(context))
   }
 
@@ -134,6 +141,8 @@ class MedicineCameraView(context: Context, appContext: AppContext) : ExpoView(co
         }
       })
   }
+
+  companion object { private const val TAG = "NextStepCamera" }
 
   fun destroy() {
     release()

@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BigButton, Body, LanguageChips, Logo, Screen, TaskCard, Title } from '../components/ui';
 import { type StringKey, useI18n } from '../i18n';
-import { NextStepAgent } from '../lib/agent';
+import { heardErrorKey, NextStepAgent } from '../lib/agent';
 import { colors, size } from '../theme';
 
 const CARDS: { label: StringKey; goal: StringKey; icon: 'basket' | 'pill' | 'music' | 'shield-check' }[] = [
@@ -47,12 +47,12 @@ export default function Talk() {
     setListening(true);
     setStatus(t('listening'));
     const heard = await NextStepAgent.listenOnce(lang.tag).finally(() => setListening(false));
-    if (!heard) {
-      setStatus(t('didNotHear'));
+    if (!heard.text) {
+      if (heard.error !== 'cancelled') setStatus(t(heardErrorKey(heard.error)));
       return;
     }
-    setStatus(`${t('youSaid')}: “${heard}”`);
-    start(heard);
+    setStatus(`${t('youSaid')}: “${heard.text}”`);
+    start(heard.text);
   };
 
   return (

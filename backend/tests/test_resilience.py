@@ -61,3 +61,30 @@ def test_real_errors_are_not_hidden():
 
     with pytest.raises(BadRequest):
         run(first_working(["a", "b"], call))
+
+
+class QuotaDaily(Exception):
+    code = 429
+
+    def __str__(self):
+        return "429 RESOURCE_EXHAUSTED quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier retryDelay': '15685s'"
+
+
+class Prepay(Exception):
+    code = 402
+
+
+def test_daily_quota_is_not_retried_but_other_models_are_tried(monkeypatch):
+    from app.resilience import AIUnavailable, quota_exhausted
+
+    assert quota_exhausted(QuotaDaily()) and quota_exhausted(Prepay())
+    assert not quota_exhausted(Busy())
+    calls = []
+
+    async def call(model):
+        calls.append(model)
+        raise QuotaDaily()
+
+    with pytest.raises(AIUnavailable) as e:
+        run(first_working(["a", "b"], call))
+    assert e.value.kind == "quota" and calls == ["a", "b"]  # once each, no retries

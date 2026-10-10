@@ -1,10 +1,14 @@
 """NextStep backend (Cloud Run). Orchestrates the ADK agents and Gemini Computer Use, and serves
 the family timeline."""
 
+import asyncio
 import logging
 import time
+from collections.abc import Awaitable
+from typing import TypeVar
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from . import family
@@ -15,6 +19,8 @@ from .agents.scam_shield import check_message
 from .auth import current_user
 from .config import settings
 from .operator import next_actions
+from .resilience import AIUnavailable
+from .stt import transcribe
 from .protocol import (
     ClientEvent,
     ConsentRequest,
@@ -35,6 +41,8 @@ from .protocol import (
     StartTaskResponse,
     StepRequest,
     StepResponse,
+    SttRequest,
+    SttResponse,
 )
 from .store import Profile, TaskRecord, make_store
 
@@ -58,6 +66,27 @@ class StripApiPrefix:
 
 
 app.add_middleware(StripApiPrefix)
+
+T = TypeVar("T")
+
+
+@app.exception_handler(AIUnavailable)
+async def ai_unavailable(_: Request, e: AIUnavailable) -> JSONResponse:
+    """The phone turns these into a calm, spoken message instead of "something went wrong"."""
+    log.warning("ai_unavailable kind=%s", e.kind)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": {"code": f"ai_{e.kind}", "retry_after": e.retry_after_s}},
+        headers={"Retry-After": str(e.retry_after_s)},
+    )
+
+
+async def within(budget_s: float, work: Awaitable[T]) -> T:
+    """Answer the phone before it gives up; a slow model becomes a "busy" response."""
+    try:
+        return await asyncio.wait_for(work, timeout=budget_s)
+    except TimeoutError as e:
+        raise AIUnavailable("busy", 30) from e
 
 
 def senior(uid: str = Depends(current_user)) -> str:
@@ -108,7 +137,7 @@ def get_me(uid: str = Depends(senior)) -> ProfileResponse:
 
 @app.post("/v1/tasks", response_model=StartTaskResponse)
 async def start_task(req: StartTaskRequest, user: str = Depends(senior)) -> StartTaskResponse:
-    plan = await plan_task(req.goal, req.language, req.screen)
+    plan = await within(settings.agent_budget_s, plan_task(req.goal, req.language, req.screen))
     task = TaskRecord(user_id=user, goal=req.goal, language=req.language, plan=plan)
     task.add_log("plan", summary=plan.summary, steps=plan.steps, refused=plan.refused)
     store.put(task)
@@ -143,7 +172,7 @@ async def step(task_id: str, req: StepRequest, user: str = Depends(senior)) -> S
         task.status = "failed"
         res = StepResponse(done=True, message="")
     else:
-        res = await next_actions(task, req.screen, results)
+        res = await within(settings.step_budget_s, next_actions(task, req.screen, results))
     for a in res.actions:
         task.add_log("action", name=a.name, intent=a.intent, gate=a.gate.value, reason=a.reason)
     family.on_actions(task, res.actions)
@@ -175,7 +204,7 @@ def get_task(task_id: str, user: str = Depends(senior)) -> TaskRecord:
 
 @app.post("/v1/screen/explain", response_model=ScreenExplanation)
 async def explain(req: ExplainRequest, user: str = Depends(senior)) -> ScreenExplanation:
-    res = await explain_screen(req.language, req.screen)
+    res = await within(settings.agent_budget_s, explain_screen(req.language, req.screen))
     family.on_explain(store, user, res)
     return res
 
@@ -191,9 +220,17 @@ async def scam_check(req: ScamCheckRequest, user: str = Depends(senior)) -> Scam
 @app.post("/v1/medicine/read", response_model=MedicineInfo)
 async def medicine_read(req: MedicineRequest, user: str = Depends(senior)) -> MedicineInfo:
     # The photo is processed in memory only; it is never stored server-side.
-    info = await read_medicine(req)
+    info = await within(settings.agent_budget_s, read_medicine(req))
     family.on_medicine(store, user, info)
     return info
+
+
+@app.post("/v1/stt", response_model=SttResponse)
+async def stt(req: SttRequest, user: str = Depends(senior)) -> SttResponse:
+    """Transcribes a short voice clip; audio is not stored."""
+    if len(req.audio_b64) > 2_000_000:  # ~45 s of 16 kHz audio: far beyond a spoken request
+        raise HTTPException(413, "Audio too long")
+    return SttResponse(text=await transcribe(req.audio_b64, req.language, req.sample_rate))
 
 
 @app.post("/v1/events")

@@ -108,10 +108,10 @@ class NextStepAgentModule : Module() {
     /** Sends NextStep to the background so the agent can work in the target app. */
     Function("minimizeApp") { appContext.currentActivity?.moveTaskToBack(true); Unit }
 
-    /** One-shot speech recognition in the given BCP-47 language. Resolves null on silence. */
+    /** Records and transcribes one utterance. Resolves {text, error}; see Heard for error codes. */
     AsyncFunction("listenOnce") { lang: String, promise: Promise ->
       val v = voice ?: VoiceIO(context).also { voice = it }
-      v.listen(lang) { promise.resolve(it) }
+      v.listen(lang) { promise.resolve(it.toMap()) }
     }
 
     Function("cancelListening") { voice?.cancelListening(); Unit }
