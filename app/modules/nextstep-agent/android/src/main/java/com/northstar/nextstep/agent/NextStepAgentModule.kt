@@ -66,6 +66,10 @@ class NextStepAgentModule : Module() {
       (cfg["apiBaseUrl"] as? String)?.let { p.apiBaseUrl = it }
       (cfg["language"] as? String)?.let { p.language = it }
       (cfg["authToken"] as? String)?.let { p.authToken = it }
+      (cfg["refreshToken"] as? String)?.let { p.refreshToken = it }
+      (cfg["tokenExpiresAt"] as? Number)?.let { p.tokenExpiresAt = it.toLong() }
+      (cfg["firebaseApiKey"] as? String)?.let { p.firebaseApiKey = it }
+      (cfg["deviceId"] as? String)?.let { p.deviceId = it }
       (cfg["scamCheckEnabled"] as? Boolean)?.let { p.scamCheckEnabled = it }
       (cfg["overlayEnabled"] as? Boolean)?.let { p.overlayEnabled = it }
       (cfg["labels"] as? Map<*, *>)?.let { p.labelsJson = JSONObject(it).toString() }

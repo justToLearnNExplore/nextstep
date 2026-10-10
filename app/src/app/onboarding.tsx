@@ -3,14 +3,16 @@ import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, PermissionsAndroid, ScrollView, StyleSheet, View } from 'react-native';
 
+import { NameCapture } from '../components/NameCapture';
 import { BigButton, Body, LanguageChips, Logo, Screen, Title } from '../components/ui';
 import { useI18n } from '../i18n';
 import { configureAgent, NextStepAgent } from '../lib/agent';
 import { colors, size } from '../theme';
 import { ONBOARDED_KEY } from './index';
 
-type Step = 'language' | 'welcome' | 'accessibility' | 'mic' | 'notifications';
-const ORDER: Step[] = ['language', 'welcome', 'accessibility', 'mic', 'notifications'];
+type Step = 'language' | 'welcome' | 'mic' | 'name' | 'accessibility' | 'notifications';
+// Microphone comes before the name so the senior can simply say it.
+const ORDER: Step[] = ['language', 'welcome', 'mic', 'name', 'accessibility', 'notifications'];
 
 /**
  * One idea per screen, with a plain-language disclosure of exactly what each permission allows
@@ -75,6 +77,8 @@ export default function Onboarding() {
             )}
           </>
         )}
+
+        {step === 'name' && <NameCapture onDone={next} />}
 
         {step === 'mic' && (
           <>

@@ -39,10 +39,27 @@ class Prefs(context: Context) {
     get() = sp.getString("language", "en-IN")!!
     set(v) = sp.edit().putString("language", v).apply()
 
-  /** Firebase ID token forwarded to the backend. Refreshed by JS. */
+  /** Firebase ID token for the backend. Set by JS, refreshed by BackendClient when it expires. */
   var authToken: String?
     get() = sp.getString("authToken", null)
     set(v) = sp.edit().putString("authToken", v).apply()
+
+  var refreshToken: String?
+    get() = sp.getString("refreshToken", null)
+    set(v) = sp.edit().putString("refreshToken", v).apply()
+
+  /** Epoch millis when [authToken] expires. */
+  var tokenExpiresAt: Long
+    get() = sp.getLong("tokenExpiresAt", 0)
+    set(v) = sp.edit().putLong("tokenExpiresAt", v).apply()
+
+  var firebaseApiKey: String?
+    get() = sp.getString("firebaseApiKey", null)
+    set(v) = sp.edit().putString("firebaseApiKey", v).apply()
+
+  var deviceId: String?
+    get() = sp.getString("deviceId", null)
+    set(v) = sp.edit().putString("deviceId", v).apply()
 
   /** Overlay strings for the current language, pushed from the JS locale pack. */
   var labelsJson: String

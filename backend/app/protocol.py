@@ -201,3 +201,54 @@ class ScamVerdict(BaseModel):
 class ScamCheckResponse(ScamVerdict):
     official_url: str | None = None
     official_label: str | None = None
+
+
+# ---- profile & family sharing ------------------------------------------------------------
+
+
+class ProfileUpdate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=40)
+    language: str = "en-IN"
+
+
+class ProfileResponse(BaseModel):
+    display_name: str
+    language: str
+    viewers: list[str] = Field(default_factory=list, description="Names of family members who can see the timeline.")
+
+
+class InviteResponse(BaseModel):
+    code: str
+    join_url: str
+    expires_at: float
+
+
+class JoinRequest(BaseModel):
+    code: str
+    viewer_name: str = ""
+
+
+class JoinResponse(BaseModel):
+    viewer_token: str
+    senior_name: str
+
+
+class FeedEvent(BaseModel):
+    id: str
+    at: float
+    kind: str
+    severity: str
+    title: str
+    detail: str = ""
+
+
+class FeedResponse(BaseModel):
+    senior_name: str
+    language: str
+    last_seen: float
+    events: list[FeedEvent]
+
+
+class ClientEvent(BaseModel):
+    kind: str
+    data: dict[str, Any] = Field(default_factory=dict)

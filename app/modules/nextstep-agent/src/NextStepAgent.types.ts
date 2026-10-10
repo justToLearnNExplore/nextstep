@@ -21,7 +21,13 @@ export type AgentLogEntry = {
 export type NextStepConfig = {
   apiBaseUrl?: string;
   language?: string;
+  /** Firebase ID token + refresh data, so the native agent can call the backend on its own. */
   authToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: number;
+  firebaseApiKey?: string;
+  /** Dev-only identity when Firebase is not configured. */
+  deviceId?: string;
   scamCheckEnabled?: boolean;
   overlayEnabled?: boolean;
   /** Overlay strings + yes/no words for the active language (from src/i18n/locales). */
