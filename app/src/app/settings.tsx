@@ -1,11 +1,14 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Switch, TextInput, View } from 'react-native';
 
+import { FamilySharing } from '../components/FamilySharing';
+import { NameCapture } from '../components/NameCapture';
 import { BigButton, Body, LanguageChips, Screen, Title } from '../components/ui';
 import { useI18n } from '../i18n';
 import { configureAgent, NextStepAgent } from '../lib/agent';
 import { type Contact, type Recipient, useContacts } from '../lib/contacts';
+import { getIdentity } from '../lib/identity';
 import { colors, fonts, size } from '../theme';
 
 export default function Settings() {
@@ -13,11 +16,35 @@ export default function Settings() {
   const [scam, setScam] = useState(NextStepAgent.isNotificationAccessEnabled());
   const [bubble, setBubble] = useState(true);
   const { contacts, loaded, save } = useContacts();
+  const [name, setName] = useState<string | null>(null);
+  const [editingName, setEditingName] = useState(false);
+
+  useEffect(() => {
+    getIdentity().then((id) => setName(id?.name ?? null));
+  }, []);
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.body}>
         <Title>{t('settings')}</Title>
+
+        {editingName ? (
+          <NameCapture
+            initial={name ?? undefined}
+            onDone={(n) => {
+              setName(n);
+              setEditingName(false);
+            }}
+          />
+        ) : (
+          <View style={styles.row}>
+            <View style={{ flex: 1 }}>
+              <Body style={styles.label}>{t('yourName')}</Body>
+              <Body style={{ fontSize: 26 }}>{name ?? '—'}</Body>
+            </View>
+            <BigButton label={t('change')} tone="outline" onPress={() => setEditingName(true)} />
+          </View>
+        )}
 
         <Body style={styles.label}>{t('language')}</Body>
         <LanguageChips />
@@ -47,6 +74,8 @@ export default function Settings() {
             <ContactEditor title={t('myFamily')} who="family" initial={contacts.family} onSave={save} />
           </>
         ) : null}
+
+        <FamilySharing />
 
         <BigButton label={t('actionLog')} icon="format-list-checks" tone="outline" onPress={() => router.push('/log')} />
         <BigButton label={t('back')} icon="arrow-left" onPress={() => router.back()} />

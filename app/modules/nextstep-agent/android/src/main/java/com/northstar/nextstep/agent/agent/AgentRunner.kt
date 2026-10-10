@@ -265,6 +265,7 @@ class AgentRunner(
 
       val question = t("confirmSendPhoto", "Send this medicine photo to {name} on WhatsApp?").replace("{name}", recipient)
       if (!ask(question, t("yesSend", "Yes, send"), t("no", "No"))) {
+        api.postQuietly("/v1/events", JSONObject().put("kind", "share_declined").put("data", JSONObject().put("recipient", recipient)))
         say(t("notSent", "Okay, I did not send it."), finalMessage = true)
         return@execute
       }
@@ -273,6 +274,7 @@ class AgentRunner(
         executor.waitForNode(3_000, isSend)?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true
       }
       log("share_sent", JSONObject().put("recipient", recipient).put("ok", sent))
+      if (sent) api.postQuietly("/v1/events", JSONObject().put("kind", "share_sent").put("data", JSONObject().put("recipient", recipient)))
       say(if (sent) t("photoSent", "Sent.") else t("pickChatYourself", "Please tap Send yourself."), finalMessage = true)
     } catch (e: Exception) {
       log("error", JSONObject().put("message", e.message))

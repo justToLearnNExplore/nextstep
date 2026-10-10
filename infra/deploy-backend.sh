@@ -17,7 +17,7 @@ gcloud run deploy "$SERVICE" \
   --source "$(dirname "$0")/../backend" \
   --allow-unauthenticated \
   --set-secrets "GOOGLE_API_KEY=gemini-api-key:latest" \
-  --set-env-vars "NEXTSTEP_STORE=firestore,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXTSTEP_REQUIRE_AUTH=false" \
+  --set-env-vars "NEXTSTEP_STORE=firestore,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXTSTEP_REQUIRE_AUTH=${REQUIRE_AUTH:-false},NEXTSTEP_DASHBOARD_URL=https://$PROJECT_ID.web.app" \
   --memory 1Gi --cpu 1 --timeout 120 --min-instances 0 --max-instances 5
 
 gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format 'value(status.url)'

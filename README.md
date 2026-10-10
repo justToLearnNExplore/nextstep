@@ -45,6 +45,8 @@ A red **Stop now** button is visible throughout every task.
 - **Understand this screen**: explains any screen in plain words, flags danger (for example "this page wants your UPI PIN") and offers *Take me back* / *Go home*.
 - **Scam shield** (opt-in): checks WhatsApp/SMS notifications using rules (lookalike domains, KYC, OTP and urgency patterns) plus Gemini. It warns the user and offers only the verified official website, never the link from the message.
 - **Languages**: English, हिंदी, ಕನ್ನಡ. Adding one means a JSON file plus a registry entry (see below).
+- **No login, ever**: the senior just *says their name* during setup. NextStep creates an anonymous Firebase account bound to the phone under that name. There's no username, password or OTP.
+- **Family view** (Firebase Hosting): the senior taps *Share with family* and NextStep sends a one-time link on WhatsApp. Family members open it and see a live timeline of tasks, scam alerts, and a stamp for every *yes*, *no* or private step. They never see the screen, photos, messages, passwords or OTPs. *Stop sharing* revokes access instantly. A public demo is at `/demo`.
 - **Action log**: what NextStep saw, planned, asked and did.
 - **Designed for older eyes and hands**: Atkinson Hyperlegible type, AAA-contrast palette (no pale blue/green distinctions), at least 64dp touch targets, every message spoken aloud, colour never the only signal.
 
@@ -57,7 +59,8 @@ A red **Stop now** button is visible throughout every task.
 | Agents | **Google ADK** (Python): planner, screen explainer, scam shield, all with structured output |
 | Phone operator | **Gemini Computer Use**, `environment: "mobile"`, Interactions API with server-side state |
 | Backend | FastAPI on **Cloud Run** |
-| Data | **Firestore** (task log, no screenshots stored), **Secret Manager** (Gemini key), **Firebase Auth** (ID-token verification) |
+| Data | **Firestore** (tasks, profiles, family timeline; no screenshots, photos or message texts stored), **Secret Manager** (Gemini key), **Firebase Auth** (anonymous, voice-named accounts) |
+| Family view | Vite + TypeScript on **Firebase Hosting**; `/api/**` is forwarded to Cloud Run (same origin) |
 
 ```
 app/                         React Native app (Expo)
@@ -78,7 +81,11 @@ backend/                     Python, Cloud Run
   app/operator.py            Gemini Computer Use loop
   app/guardian.py            server-side gate
   app/official_sites.py      verified official URLs + lookalike detection
+  app/family.py              family timeline events + invite/viewer sharing
+dashboard/                   family view (Vite + TS): landing, join link, live timeline, demo
+firebase.json                Hosting config (/api/** → Cloud Run)
 infra/deploy-backend.sh      Cloud Run deploy
+infra/deploy-dashboard.sh    Firebase Hosting deploy
 assets/brand/                logo
 ```
 
@@ -100,6 +107,13 @@ See the comments at the top of `infra/deploy-backend.sh` for one-time project se
 
 ```bash
 ./infra/deploy-backend.sh
+```
+
+### Family dashboard
+
+```bash
+cd dashboard && npm install && npm run dev   # http://localhost:5173 (proxies /api to :8080)
+./infra/deploy-dashboard.sh                  # Firebase Hosting
 ```
 
 ### Android app (real device, Android 11+)
@@ -136,12 +150,9 @@ Voice, the overlay and model output follow the language tag automatically.
 
 ## Status
 
-This is the scaffold. Implemented: overlay and menu, agent loop, Guardian and SafetyGate, screen explainer, scam shield, voice, onboarding, i18n, action log. Backend unit tests pass (21) and the app typechecks and lints clean. Not yet verified: compiling the Kotlin module on a device, and live Gemini Computer Use calls.
+Implemented: overlay and menu, agent loop, Guardian and SafetyGate, screen explainer, scam shield, medicine photo flow, voice-named accounts, family view, voice, onboarding, i18n, action log. Backend tests pass (30), the app typechecks and lints clean, the Android APK builds, and the family view's invite, join, timeline and revoke flow is verified locally in a browser. Not yet verified: running on a physical device, and live Gemini calls.
 
 Next:
-- Firebase Auth sign-in in the app (the backend already verifies tokens)
-- CameraX + ML Kit framing guidance for medicine photos
-- Family dashboard (Firebase Hosting)
 - Cloud Speech-to-Text fallback for Kannada
 - Device testing on Blinkit and WhatsApp
 
