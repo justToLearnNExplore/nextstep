@@ -11,7 +11,7 @@ from ..config import settings
 from ..i18n import language, phrase
 from ..official_sites import CYBER_CRIME, find_by_alias, find_by_name, is_lookalike, is_official_domain
 from ..protocol import ScamCheckRequest, ScamCheckResponse, ScamVerdict
-from .runtime import run_structured
+from .runtime import agent_config, run_structured
 
 INSTRUCTION = """
 You check one SMS/WhatsApp message received by an older adult in India for fraud.
@@ -32,7 +32,7 @@ scam_agent = LlmAgent(
     description="Classifies incoming messages for scam risk.",
     instruction=INSTRUCTION,
     output_schema=ScamVerdict,
-    generate_content_config=types.GenerateContentConfig(temperature=0.0),
+    generate_content_config=agent_config(15000),
 )
 
 URL = re.compile(r"(https?://[^\s]+|\b[\w-]+(?:\.[\w-]+)*\.(?:com|in|net|org|co|xyz|top|info|link|ly|me|site|online|app)\b[^\s]*)", re.I)
@@ -85,6 +85,7 @@ async def check_message(req: ScamCheckRequest) -> ScamCheckResponse:
             ScamVerdict,
             [types.Part(text=f"User language: {language(req.language).name} ({req.language})\n"
                              f"Sender: {req.sender}\nApp: {req.source}\nMessage:\n{req.text}")],
+            settings.fast_fallbacks,
         )
     except Exception:  # model unavailable: rules alone still protect the user
         logging.getLogger("nextstep").exception("scam_shield model call failed; using rules only")

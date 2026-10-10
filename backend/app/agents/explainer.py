@@ -6,7 +6,7 @@ from google.genai import types
 from ..config import settings
 from ..i18n import language
 from ..protocol import Screen, ScreenExplanation
-from .runtime import image_part, run_structured
+from .runtime import agent_config, image_part, run_structured
 
 INSTRUCTION = """
 You help an older adult who is confused by their phone screen.
@@ -32,12 +32,15 @@ explainer_agent = LlmAgent(
     description="Explains the current phone screen simply and suggests the safest action.",
     instruction=INSTRUCTION,
     output_schema=ScreenExplanation,
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=agent_config(),
 )
 
 
 async def explain_screen(lang_tag: str, screen: Screen) -> ScreenExplanation:
     text = f"User language: {language(lang_tag).name} ({lang_tag})\nAccessibility tree:\n{screen.summary()}"
     return await run_structured(
-        explainer_agent, ScreenExplanation, [types.Part(text=text), *image_part(screen.screenshot_b64)]
+        explainer_agent,
+        ScreenExplanation,
+        [types.Part(text=text), *image_part(screen.screenshot_b64)],
+        settings.reasoning_fallbacks,
     )

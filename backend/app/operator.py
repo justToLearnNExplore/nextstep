@@ -9,11 +9,13 @@ import json
 from typing import Any
 
 from google import genai
+from google.genai import types
 
 from .config import settings
 from .guardian import classify
 from .i18n import language
 from .protocol import GatedAction, Screen, StepResponse
+from .resilience import first_working, retry
 from .store import TaskRecord
 
 _client: genai.Client | None = None
@@ -22,7 +24,7 @@ _client: genai.Client | None = None
 def client() -> genai.Client:
     global _client
     if _client is None:
-        _client = genai.Client()
+        _client = genai.Client(http_options=types.HttpOptions(timeout=settings.operator_timeout_ms))
     return _client
 
 
@@ -113,11 +115,14 @@ async def next_actions(task: TaskRecord, screen: Screen, results: list[dict[str,
             {"type": "text", "text": f"Start the task now.\nScreen elements:\n{screen.summary()}"},
             *_image(screen),
         ]
-        interaction = await client().aio.interactions.create(
-            model=settings.operator_model,
-            system_instruction=system_instruction(task),
-            input=model_input,
-            tools=_tools(),
+        # First turn: use the first operator model that answers, and stay on it for this task.
+        models = [settings.operator_model, *settings.operator_fallbacks]
+        task.operator_model, interaction = await first_working(
+            models,
+            lambda m: client().aio.interactions.create(
+                model=m, system_instruction=system_instruction(task), input=model_input, tools=_tools()
+            ),
+            what="operator",
         )
     else:
         # Every executed call gets a result; the fresh screen goes with the last one.
@@ -131,12 +136,17 @@ async def next_actions(task: TaskRecord, screen: Screen, results: list[dict[str,
             model_input.append({"type": "function_result", "name": r["name"], "call_id": r["call_id"], "result": content})
         if not model_input:  # nothing ran (e.g. user declined): just show the current screen
             model_input = [{"type": "text", "text": f"Current screen:\n{screen.summary()}"}, *_image(screen)]
-        interaction = await client().aio.interactions.create(
-            model=settings.operator_model,
-            previous_interaction_id=task.interaction_id,
-            system_instruction=system_instruction(task),
-            input=model_input,
-            tools=_tools(),
+        model = task.operator_model or settings.operator_model
+        interaction = await retry(
+            lambda: client().aio.interactions.create(
+                model=model,
+                previous_interaction_id=task.interaction_id,
+                system_instruction=system_instruction(task),
+                input=model_input,
+                tools=_tools(),
+            ),
+            attempts=3,
+            what="operator",
         )
 
     task.interaction_id = interaction.id
