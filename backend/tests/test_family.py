@@ -111,4 +111,4 @@ def test_client_events_allow_list(client):
 
 
 def test_api_prefix_from_firebase_hosting(client):
-    assert client.get("/api/healthz").json() == {"status": "ok"}
+    assert client.get("/api/health").json() == {"status": "ok"}

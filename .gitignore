@@ -9,3 +9,4 @@ node_modules/
 service-account*.json
 .DS_Store
 .claude/launch.json
+.firebase/

@@ -1,5 +1,6 @@
 """Scam shield: deterministic signals + a fast Gemini classifier, combined conservatively."""
 
+import logging
 import re
 from urllib.parse import urlparse
 
@@ -86,6 +87,7 @@ async def check_message(req: ScamCheckRequest) -> ScamCheckResponse:
                              f"Sender: {req.sender}\nApp: {req.source}\nMessage:\n{req.text}")],
         )
     except Exception:  # model unavailable: rules alone still protect the user
+        logging.getLogger("nextstep").exception("scam_shield model call failed; using rules only")
         verdict = ScamVerdict(risk="none", warning="")
 
     # Conservative merge: the higher risk wins.

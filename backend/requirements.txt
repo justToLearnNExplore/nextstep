@@ -1,8 +1,9 @@
+# Top-level dependencies. Exact versions are locked in constraints.txt (tested set).
 google-adk==2.11.0
-google-genai>=2.29.0
-fastapi>=0.143.0
-uvicorn[standard]>=0.35.0
-pydantic>=2.11
-google-cloud-firestore>=2.21.0
-google-auth>=2.40.0
-requests>=2.32.0
+google-genai==2.29.0
+fastapi==0.141.1
+uvicorn[standard]==0.54.0
+pydantic==2.14.0
+google-cloud-firestore==2.34.1
+google-auth==2.61.0
+requests==2.34.2
