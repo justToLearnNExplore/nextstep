@@ -10,6 +10,14 @@ set -euo pipefail
 PROJECT_ID="${PROJECT_ID:-$(gcloud config get-value project)}"
 REGION="${REGION:-asia-south1}"
 SERVICE="${SERVICE:-nextstep-api}"
+# MODEL_PROFILE=free uses models that respond reliably on the Gemini free tier;
+# "paid" (default) uses the newest models, with the same fallbacks.
+MODEL_PROFILE="${MODEL_PROFILE:-paid}"
+if [ "$MODEL_PROFILE" = "free" ]; then
+  MODELS="NEXTSTEP_OPERATOR_MODEL=gemini-3.5-flash,NEXTSTEP_OPERATOR_FALLBACKS=gemini-3.8-flash,NEXTSTEP_REASONING_MODEL=gemini-3.6-flash,NEXTSTEP_REASONING_FALLBACKS=gemini-3.5-flash-lite,NEXTSTEP_FAST_MODEL=gemini-3.5-flash-lite,NEXTSTEP_FAST_FALLBACKS=gemini-3.6-flash"
+else
+  MODELS="NEXTSTEP_OPERATOR_MODEL=gemini-3.8-flash,NEXTSTEP_REASONING_MODEL=gemini-3.8-flash,NEXTSTEP_FAST_MODEL=gemini-3.5-flash-lite"
+fi
 
 gcloud run deploy "$SERVICE" \
   --project "$PROJECT_ID" \
@@ -17,7 +25,7 @@ gcloud run deploy "$SERVICE" \
   --source "$(dirname "$0")/../backend" \
   --allow-unauthenticated \
   --set-secrets "GOOGLE_API_KEY=gemini-api-key:latest" \
-  --set-env-vars "NEXTSTEP_STORE=firestore,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXTSTEP_REQUIRE_AUTH=${REQUIRE_AUTH:-false},NEXTSTEP_DASHBOARD_URL=https://$PROJECT_ID.web.app" \
+  --set-env-vars "NEXTSTEP_STORE=firestore,GOOGLE_CLOUD_PROJECT=$PROJECT_ID,NEXTSTEP_REQUIRE_AUTH=${REQUIRE_AUTH:-false},NEXTSTEP_DASHBOARD_URL=https://$PROJECT_ID.web.app,$MODELS" \
   --memory 1Gi --cpu 1 --timeout 120 --min-instances 0 --max-instances 5
 
 gcloud run services describe "$SERVICE" --project "$PROJECT_ID" --region "$REGION" --format 'value(status.url)'

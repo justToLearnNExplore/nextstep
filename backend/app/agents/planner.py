@@ -6,7 +6,7 @@ from google.genai import types
 from ..config import settings
 from ..i18n import language
 from ..protocol import Screen, TaskPlan
-from .runtime import image_part, run_structured
+from .runtime import agent_config, image_part, run_structured
 
 INSTRUCTION = """
 You are the planner of NextStep, a phone assistant for older adults in India.
@@ -40,7 +40,7 @@ planner_agent = LlmAgent(
     description="Plans phone tasks for older adults and asks for one-time consent.",
     instruction=INSTRUCTION,
     output_schema=TaskPlan,
-    generate_content_config=types.GenerateContentConfig(temperature=0.2),
+    generate_content_config=agent_config(),
 )
 
 
@@ -51,4 +51,6 @@ async def plan_task(goal: str, lang_tag: str, screen: Screen, installed: dict[st
         f"Installed apps hint: {installed or 'unknown'}\n"
         f"Current screen:\n{screen.summary(60)}"
     )
-    return await run_structured(planner_agent, TaskPlan, [types.Part(text=text), *image_part(screen.screenshot_b64)])
+    return await run_structured(
+        planner_agent, TaskPlan, [types.Part(text=text), *image_part(screen.screenshot_b64)], settings.reasoning_fallbacks
+    )

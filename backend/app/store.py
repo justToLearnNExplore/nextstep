@@ -25,6 +25,7 @@ class TaskRecord(BaseModel):
     consented: bool = False
     status: Status = "planned"
     interaction_id: str | None = None
+    operator_model: str | None = None  # chosen on the first step; an interaction can't switch models
     turns: int = 0
     created_at: float = Field(default_factory=time.time)
     log: list[dict[str, Any]] = Field(default_factory=list)

@@ -10,7 +10,7 @@ from google.genai import types
 from ..config import settings
 from ..i18n import language
 from ..protocol import MedicineInfo, MedicineRequest
-from .runtime import run_structured
+from .runtime import agent_config, run_structured
 
 INSTRUCTION = """
 You read medicine packaging photographed by an older adult in India (strip, bottle, box or
@@ -34,7 +34,7 @@ medicine_agent = LlmAgent(
     description="Reads medicine labels from photos and drafts a message to the doctor or family.",
     instruction=INSTRUCTION,
     output_schema=MedicineInfo,
-    generate_content_config=types.GenerateContentConfig(temperature=0.1),
+    generate_content_config=agent_config(),
 )
 
 
@@ -46,4 +46,4 @@ async def read_medicine(req: MedicineRequest) -> MedicineInfo:
         f"OCR text from phone:\n{req.ocr_text[:2000] or '(none)'}"
     )
     image = types.Part.from_bytes(data=base64.b64decode(req.image_b64), mime_type="image/jpeg")
-    return await run_structured(medicine_agent, MedicineInfo, [types.Part(text=text), image])
+    return await run_structured(medicine_agent, MedicineInfo, [types.Part(text=text), image], settings.reasoning_fallbacks)
