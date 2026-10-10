@@ -52,6 +52,31 @@ A red **Stop now** button is visible throughout every task.
 - **Action log**: what NextStep saw, planned, asked and did.
 - **Designed for older eyes and hands**: Atkinson Hyperlegible type, AAA-contrast palette (no pale blue/green distinctions), at least 64dp touch targets, every message spoken aloud, colour never the only signal.
 
+## Efficiency: why repeat tasks cost almost nothing
+
+Each step of a task is decided by the cheapest source that works:
+
+1. **Free rules**: known pop-ups ("Rate us", "Update", ads) are dismissed without AI.
+2. **Deep links**: YouTube and Blinkit searches jump straight to the results page.
+3. **Learned skills** (Hermes-style procedural memory). A successful task is saved as a coordinate-free recipe:
+   - each step is stored by element label plus nearby context, with `{item}` placeholders;
+   - repeats are replayed by matching labels on the live screen, with **0 model calls**;
+   - Gemini steps in only for unexpected screens, and replay then continues.
+4. **Gemini Computer Use**, kept lean:
+   - Each step is a stateless call with a stable, cache-friendly system prompt, a one-line history and the current screen. The cost per step stays flat instead of growing with every past screenshot.
+   - A screenshot is sent only when the element list isn't enough, at medium resolution.
+   - Routine steps use low thinking.
+   - Up to 3 safe actions per call.
+
+| | Gemini calls for "order milk" |
+|---|---|
+| First time | ~15–20 |
+| Next time, any item (skill replay) | **0–2** |
+
+The skills test proves this: 5 calls on the first order, then **0** on the next order of a different item, still picking the right product, and **Place order still asks**.
+
+Every task records its AI calls, skill and rule steps, and input/cached/output tokens. Scam checks run on free deterministic rules plus **Gemma 4**, an open model that can later run on the phone itself.
+
 ## Architecture
 
 | Layer | Tech |
