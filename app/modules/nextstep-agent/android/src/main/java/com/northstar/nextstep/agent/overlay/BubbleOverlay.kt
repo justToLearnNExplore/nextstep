@@ -42,6 +42,7 @@ data class PanelButton(val label: String, val style: Style, val onClick: () -> U
 interface OverlayHost {
   fun onOpenApp(key: String)
   fun onUnderstandScreen()
+  fun onCheckScam()
   fun onTalk()
   fun onCloseNextStep()
   fun onStopNow()
@@ -100,6 +101,11 @@ class BubbleOverlay(
     popup = null; panel = null; bubbleRoot = null
   }
 
+  /** Hides only the bubble (e.g. while the NextStep app itself is open); panels are unaffected. */
+  fun setBubbleHidden(hidden: Boolean) = main.post {
+    bubbleRoot?.visibility = if (hidden && !busy) View.GONE else View.VISIBLE
+  }
+
   /** Green dashed ring + red Stop pill while a task is running. */
   fun setBusy(value: Boolean) = main.post {
     busy = value
@@ -147,10 +153,14 @@ class BubbleOverlay(
       addView(bigButton(t("understand", "Understand this screen"), Style.OUTLINE, "◉") {
         closePopupNow(); host.onUnderstandScreen()
       })
+      addView(bigButton(t("checkScam", "Check for scam"), Style.OUTLINE, "⚠") {
+        closePopupNow(); host.onCheckScam()
+      })
       addView(bigButton(t("talk", "Talk to NextStep"), Style.PRIMARY, "●", tall = true) {
         closePopupNow(); host.onTalk()
       })
-      addView(bigButton(t("close", "Close NextStep"), Style.OUTLINE, "⏻", small = true) {
+      // "✕" renders on every phone; the power symbol was missing from some fonts (showed a box).
+      addView(bigButton(t("close", "Close NextStep"), Style.OUTLINE, "✕", small = true) {
         closePopupNow(); host.onCloseNextStep()
       })
     }

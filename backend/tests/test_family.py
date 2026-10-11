@@ -112,3 +112,25 @@ def test_client_events_allow_list(client):
 
 def test_api_prefix_from_firebase_hosting(client):
     assert client.get("/api/health").json() == {"status": "ok"}
+
+
+def test_check_screen_for_scam(client, monkeypatch):
+    viewer = link_family(client)
+    seen = {}
+
+    async def fake_check(req):
+        seen["text"] = req.text
+        return ScamCheckResponse(risk="high", reasons=["lookalike_domain:sbi-kyc.in"], impersonates="State Bank of India",
+                                 warning="", official_url="https://www.onlinesbi.sbi", official_label="State Bank of India")
+
+    monkeypatch.setattr("app.agents.scam_shield.check_message", fake_check)
+    screen = {"package": "com.whatsapp", "width": 1000, "height": 2000, "nodes": [
+        {"i": 0, "text": "Chats", "b": [0, 0, 300, 100]},
+        {"i": 1, "text": "Your SBI account is blocked, update KYC at sbi-kyc.in", "b": [0, 900, 1000, 1000]},
+        {"i": 2, "text": "", "b": [0, 1800, 1000, 1900], "edit": True, "secure": True},
+    ]}
+    r = client.post("/v1/scam/screen", json={"language": "en-IN", "screen": screen}, headers=SENIOR).json()
+    assert r["risk"] == "high" and r["official_url"] == "https://www.onlinesbi.sbi"
+    assert "Do not open the link" in r["warning"]  # fallback warning when the model gave none
+    assert "sbi-kyc.in" in seen["text"]
+    assert client.get("/v1/family/feed", headers=viewer).json()["events"][0]["kind"] == "scam_blocked"

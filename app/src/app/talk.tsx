@@ -12,7 +12,6 @@ const CARDS: { label: StringKey; goal: StringKey; icon: 'basket' | 'pill' | 'mus
   { label: 'cardGroceries', goal: 'goalGroceries', icon: 'basket' },
   { label: 'cardMedicinePhoto', goal: 'goalMedicinePhoto', icon: 'pill' },
   { label: 'cardBhajan', goal: 'goalBhajan', icon: 'music' },
-  { label: 'cardCheckMessage', goal: 'goalCheckMessage', icon: 'shield-check' },
 ];
 
 /**
@@ -82,6 +81,8 @@ export default function Talk() {
           {CARDS.slice(2).map((c) => (
             <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => open(c)} />
           ))}
+          {/* Keeps the last card the same size as the others. */}
+          <View style={{ flex: 1 }} />
         </View>
       </View>
 

@@ -26,6 +26,7 @@ _EN = {
     "no_consent": "I need your approval before I start.",
     "scam_warning": "This message looks like a scam. Do not open the link and do not share any details or OTP.",
     "waiting_install": "Please tap Install. I'll continue as soon as it's installed.",
+    "scam_safe": "I don't see signs of a scam here. Still, never share your OTP, PIN or password with anyone.",
 }
 
 LANGUAGES: dict[str, Language] = {
@@ -43,6 +44,7 @@ LANGUAGES: dict[str, Language] = {
             "no_consent": "शुरू करने से पहले मुझे आपकी अनुमति चाहिए।",
             "scam_warning": "यह मैसेज धोखा लगता है। लिंक मत खोलिए और कोई जानकारी या ओटीपी मत बताइए।",
             "waiting_install": "कृपया Install दबाइए। इंस्टॉल होते ही मैं आगे बढ़ूँगा।",
+            "scam_safe": "मुझे यहाँ धोखे के संकेत नहीं दिखते। फिर भी अपना ओटीपी, पिन या पासवर्ड किसी को न बताएँ।",
         },
     ),
     "kn-IN": Language(
@@ -58,6 +60,7 @@ LANGUAGES: dict[str, Language] = {
             "no_consent": "ಶುರು ಮಾಡುವ ಮೊದಲು ನಿಮ್ಮ ಒಪ್ಪಿಗೆ ಬೇಕು.",
             "scam_warning": "ಈ ಸಂದೇಶ ಮೋಸದಂತೆ ಕಾಣುತ್ತದೆ. ಲಿಂಕ್ ತೆರೆಯಬೇಡಿ, ಯಾವುದೇ ವಿವರ ಅಥವಾ ಒಟಿಪಿ ಹಂಚಿಕೊಳ್ಳಬೇಡಿ.",
             "waiting_install": "ದಯವಿಟ್ಟು Install ಒತ್ತಿ. ಇನ್‌ಸ್ಟಾಲ್ ಆದ ತಕ್ಷಣ ನಾನು ಮುಂದುವರಿಸುತ್ತೇನೆ.",
+            "scam_safe": "ಇಲ್ಲಿ ಮೋಸದ ಲಕ್ಷಣಗಳು ಕಾಣುತ್ತಿಲ್ಲ. ಆದರೂ ನಿಮ್ಮ ಒಟಿಪಿ, ಪಿನ್ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್ ಯಾರಿಗೂ ಹೇಳಬೇಡಿ.",
         },
     ),
 }

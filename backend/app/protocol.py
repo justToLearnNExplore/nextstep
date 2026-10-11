@@ -242,6 +242,11 @@ class ScamCheckRequest(BaseModel):
     text: str
 
 
+class ScreenScamRequest(BaseModel):
+    language: str = "en-IN"
+    screen: Screen
+
+
 class ScamVerdict(BaseModel):
     risk: Literal["none", "low", "medium", "high"]
     reasons: list[str] = Field(default_factory=list, description="Short English reason codes.")

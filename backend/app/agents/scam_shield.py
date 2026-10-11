@@ -10,7 +10,7 @@ from google.genai import types
 from ..config import settings
 from ..i18n import language, phrase
 from ..official_sites import CYBER_CRIME, find_by_alias, find_by_name, is_lookalike, is_official_domain
-from ..protocol import ScamCheckRequest, ScamCheckResponse, ScamVerdict
+from ..protocol import ScamCheckRequest, ScamCheckResponse, ScamVerdict, Screen
 from .runtime import agent_config, run_structured
 
 INSTRUCTION = """
@@ -20,7 +20,8 @@ parcel held by India Post/courier, income-tax refund, lottery/prize, job offers,
 number", requests for OTP/PIN/UPI collect requests, links to install AnyDesk/TeamViewer/APK files,
 fake police/CBI "digital arrest" threats.
 
-Return risk none|low|medium|high with short English reason codes and `impersonates` if the message
+If you are given a whole screen (a chat or inbox), judge the most recent message(s) from other
+people; ignore app buttons and menus. Return risk none|low|medium|high with short English reason codes and `impersonates` if the message
 pretends to be an organisation. Write `warning` in the user's language, 1-2 calm sentences. When
 risk is medium or high it must say: do not open the link and do not share any details/OTP.
 For none/low, `warning` can be empty. Never repeat the link in the warning.
@@ -105,3 +106,24 @@ async def check_message(req: ScamCheckRequest) -> ScamCheckResponse:
         official_url=official.url if official and risk in ("medium", "high") else None,
         official_label=official.name if official and risk in ("medium", "high") else None,
     )
+
+
+def visible_text(screen: Screen, limit: int = 3000) -> str:
+    """Readable text on screen, top to bottom (secure fields never included)."""
+    nodes = sorted((n for n in screen.nodes if n.label() and not n.secure), key=lambda n: (n.b[1] if len(n.b) == 4 else 0))
+    seen, lines = set(), []
+    for n in nodes:
+        t = (n.text or n.desc or "").strip()
+        if t and t not in seen:
+            seen.add(t)
+            lines.append(t)
+    return "\n".join(lines)[-limit:]  # the newest messages are usually at the bottom
+
+
+async def check_screen(language_tag: str, screen: Screen) -> ScamCheckResponse:
+    """'Check for scam' from the bubble: the messages currently on screen, in any app."""
+    text = visible_text(screen)
+    res = await check_message(ScamCheckRequest(language=language_tag, source=screen.package, sender="(current screen)", text=text))
+    if not res.warning:
+        res.warning = phrase(language_tag, "scam_safe" if res.risk in ("none", "low") else "scam_warning")
+    return res

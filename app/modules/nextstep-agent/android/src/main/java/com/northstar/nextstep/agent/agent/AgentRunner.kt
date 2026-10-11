@@ -222,6 +222,34 @@ class AgentRunner(
     }
   }
 
+  /**
+   * "Check for scam" from the bubble: reads the messages on the current screen (any app), asks
+   * the scam shield, and tells the user. Offers only the verified official site, never the link
+   * from the message.
+   */
+  fun checkScreenForScam() = worker.execute {
+    try {
+      overlay.showPanel(t("scamChecking", "Checking this message…"), emptyList())
+      val screen = overlay.whileHidden { reader.capture(withScreenshot = false) }
+      val res = api.post("/v1/scam/screen", JSONObject().put("language", lang).put("screen", screen.toJson()))
+      log("scam_check", res)
+      val risky = res.optString("risk") in setOf("high", "medium")
+      val buttons = mutableListOf<PanelButton>()
+      res.optString("official_url").takeIf { risky && it.startsWith("https://") }?.let { url ->
+        buttons += PanelButton(t("openOfficial", "Open official website"), Style.GO) {
+          overlay.hidePanel()
+          service.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+      }
+      buttons += PanelButton(t("ok", "OK"), Style.PRIMARY) { voice.stopSpeaking(); overlay.hidePanel() }
+      overlay.showPanel(res.getString("warning"), buttons, if (risky) Style.STOP else null)
+      voice.speak(res.getString("warning"), lang)
+    } catch (e: Exception) {
+      Log.e(TAG, "checkScreenForScam failed", e)
+      say(explain(e), finalMessage = true)
+    }
+  }
+
   /** Scam shield: called by the NotificationWatcher for opted-in message apps. Never taps links. */
   fun checkMessage(sourcePkg: String, sender: String, text: String) = worker.execute {
     runCatching {

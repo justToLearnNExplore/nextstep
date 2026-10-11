@@ -15,7 +15,7 @@ from . import agent_loop, family
 from .agents.explainer import explain_screen
 from .agents.medicine_reader import read_medicine
 from .agents.planner import plan_task
-from .agents.scam_shield import check_message
+from .agents.scam_shield import check_message, check_screen
 from .auth import current_user
 from .config import settings
 from .resilience import AIUnavailable
@@ -35,6 +35,7 @@ from .protocol import (
     ProfileUpdate,
     ScamCheckRequest,
     ScamCheckResponse,
+    ScreenScamRequest,
     ScreenExplanation,
     StartTaskRequest,
     StartTaskResponse,
@@ -219,6 +220,15 @@ async def explain(req: ExplainRequest, user: str = Depends(senior)) -> ScreenExp
 async def scam_check(req: ScamCheckRequest, user: str = Depends(senior)) -> ScamCheckResponse:
     res = await check_message(req)
     log.info("scam_check user=%s risk=%s reasons=%s", user, res.risk, res.reasons)
+    family.on_scam(store, user, res)
+    return res
+
+
+@app.post("/v1/scam/screen", response_model=ScamCheckResponse)
+async def scam_screen(req: ScreenScamRequest, user: str = Depends(senior)) -> ScamCheckResponse:
+    """'Check for scam' from the bubble menu: analyses the messages on the current screen."""
+    res = await within(settings.agent_budget_s, check_screen(req.language, req.screen))
+    log.info("scam_screen user=%s app=%s risk=%s", user, req.screen.package, res.risk)
     family.on_scam(store, user, res)
     return res
 

@@ -42,9 +42,14 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
   override fun onAccessibilityEvent(event: AccessibilityEvent?) {
     // The agent pulls screen state on demand; when the user switches apps we fold the menu
     // back into the bubble, as the spec asks.
-    if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
-      event.packageName != null && event.packageName != packageName && !runner.isRunning) {
-      overlay.closePopup()
+    if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.packageName == null) return
+    val inOurApp = event.packageName == packageName && event.className?.toString()?.endsWith("MainActivity") == true
+    if (inOurApp) {
+      // Inside NextStep itself the bubble isn't needed (and would cover the Settings button).
+      overlay.setBubbleHidden(true)
+    } else if (event.packageName != packageName) {
+      overlay.setBubbleHidden(false)
+      if (!runner.isRunning) overlay.closePopup()
     }
   }
 
@@ -63,6 +68,8 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
   override fun onOpenApp(key: String) = runner.openQuickApp(key)
 
   override fun onUnderstandScreen() = runner.understandScreen()
+
+  override fun onCheckScam() = runner.checkScreenForScam()
 
   /** Opens the NextStep "Talk" screen (picture shortcuts + big mic) in the React Native app. */
   override fun onTalk() {
