@@ -1,110 +1,99 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { router, type Href } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BigButton, Body, LanguageChips, Logo, Screen, TaskCard, Title } from '../components/ui';
+import { MicButton } from '../components/MicButton';
+import { Body, Logo, Screen } from '../components/ui';
 import { type StringKey, useI18n } from '../i18n';
-import { heardErrorKey, NextStepAgent, startGoal } from '../lib/agent';
-import { colors, size } from '../theme';
+import { startGoal } from '../lib/agent';
+import { getIdentity } from '../lib/identity';
+import { colors, fonts, size } from '../theme';
 
-const CARDS: { label: StringKey; goal: StringKey; icon: 'basket' | 'pill' | 'music' | 'shield-check' }[] = [
-  { label: 'cardGroceries', goal: 'goalGroceries', icon: 'basket' },
-  { label: 'cardMedicinePhoto', goal: 'goalMedicinePhoto', icon: 'pill' },
-  { label: 'cardBhajan', goal: 'goalBhajan', icon: 'music' },
+type Icon = 'basket' | 'pill' | 'car' | 'cellphone-cog';
+const HELPERS: { label: StringKey; icon: Icon; href: Href }[] = [
+  { label: 'homeGroceries', icon: 'basket', href: '/grocery' },
+  { label: 'homeMedicine', icon: 'pill', href: '/medicine?to=doctor' },
+  { label: 'homeRide', icon: 'car', href: '/ride' },
+  { label: 'homePhone', icon: 'cellphone-cog', href: '/phone' },
 ];
 
 /**
- * "Talk to NextStep": picture shortcuts for common tasks plus one big Speak button.
- * Starting a task hands control to the native agent and steps NextStep out of the way;
- * the plan, confirmations and Stop button then live in the floating overlay.
+ * Home: a greeting, one big mic for anything, and four helpers for the most common needs.
+ * Language lives in Settings. Starting a task steps NextStep out of the way; the plan,
+ * confirmations and Stop then live in the floating bubble.
  */
-export default function Talk() {
-  const { t, lang } = useI18n();
+export default function Home() {
+  const { t } = useI18n();
+  const [name, setName] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
-  const [listening, setListening] = useState(false);
+
+  useEffect(() => {
+    getIdentity().then((id) => setName(id?.name || null));
+  }, []);
 
   const start = async (goal: string) => {
     if (!(await startGoal(goal))) setStatus(t('serviceOff'));
   };
 
-  // The medicine card goes straight to NextStep's guided camera; other cards start an agent task.
-  // Groceries and medicine photos have their own screens; the others start a task directly.
-  const open = (c: (typeof CARDS)[number]) =>
-    c.label === 'cardMedicinePhoto'
-      ? router.push('/medicine?to=doctor')
-      : c.label === 'cardGroceries'
-        ? router.push('/grocery')
-        : start(t(c.goal));
-
-  const speak = async () => {
-    if (listening) {
-      NextStepAgent.cancelListening();
-      return;
-    }
-    setListening(true);
-    setStatus(t('listening'));
-    const heard = await NextStepAgent.listenOnce(lang.tag).finally(() => setListening(false));
-    if (!heard.text) {
-      if (heard.error !== 'cancelled') setStatus(t(heardErrorKey(heard.error)));
-      return;
-    }
-    setStatus(`${t('youSaid')}: “${heard.text}”`);
-    start(heard.text);
-  };
-
   return (
     <Screen>
       <View style={styles.header}>
-        <Logo size={48} />
-        <View style={{ flex: 1 }} />
-        <Pressable
-          onPress={() => router.push('/settings')}
-          accessibilityRole="button"
-          accessibilityLabel={t('settings')}
-          style={styles.iconButton}
-        >
+        <Logo size={44} />
+        <Pressable onPress={() => router.push('/settings')} accessibilityRole="button" accessibilityLabel={t('settings')} style={styles.iconButton}>
           <MaterialCommunityIcons name="cog" size={30} color={colors.ink} />
         </Pressable>
       </View>
-      <LanguageChips />
-      <View style={{ height: 16 }} />
-      <Title>{t('talkTitle')}</Title>
 
-      <View style={styles.grid}>
-        <View style={styles.row}>
-          {CARDS.slice(0, 2).map((c) => (
-            <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => open(c)} />
-          ))}
-        </View>
-        <View style={styles.row}>
-          {CARDS.slice(2).map((c) => (
-            <TaskCard key={c.label} label={t(c.label)} icon={c.icon} onPress={() => open(c)} />
-          ))}
-          {/* Keeps the last card the same size as the others. */}
-          <View style={{ flex: 1 }} />
-        </View>
+      <Text style={styles.greeting} accessibilityRole="header">
+        {name ? t('greetingNamed').replace('{name}', name) : t('greetingPlain')}
+      </Text>
+
+      <View style={styles.center}>
+        <MicButton onHeard={start} label={t('tapAndSpeak')} />
+        {status ? <Body style={{ textAlign: 'center' }}>{status}</Body> : null}
       </View>
 
-      {status ? <Body style={styles.status}>{status}</Body> : null}
-      <View style={styles.footer}>
-        <BigButton
-          label={listening ? t('listening') : t('speak')}
-          icon={listening ? 'microphone-off' : 'microphone'}
-          tone={listening ? 'go' : 'primary'}
-          tall
-          onPress={speak}
-        />
+      <View style={styles.grid}>
+        {[0, 2].map((i) => (
+          <View key={i} style={styles.row}>
+            {HELPERS.slice(i, i + 2).map((h) => (
+              <Pressable
+                key={h.label}
+                onPress={() => router.push(h.href)}
+                accessibilityRole="button"
+                accessibilityLabel={t(h.label)}
+                style={({ pressed }) => [styles.tile, pressed && { backgroundColor: colors.amber }]}
+              >
+                <MaterialCommunityIcons name={h.icon} size={34} color={colors.ink} />
+                <Text style={styles.tileText}>{t(h.label)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ))}
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
   iconButton: { width: size.touch, height: size.touch, alignItems: 'center', justifyContent: 'center' },
-  grid: { gap: 12, marginTop: 16 },
+  greeting: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 36, color: colors.ink, textAlign: 'center', marginTop: 8 },
+  center: { flex: 1, justifyContent: 'center', gap: 12 },
+  grid: { gap: 12, paddingBottom: 20 },
   row: { flexDirection: 'row', gap: 12 },
-  status: { marginTop: 16, textAlign: 'center' },
-  footer: { marginTop: 'auto', paddingBottom: 20 },
+  tile: {
+    flex: 1,
+    minHeight: 96,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: colors.ink,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 8,
+  },
+  tileText: { fontFamily: fonts.bold, fontSize: 19, color: colors.ink, textAlign: 'center' },
 });

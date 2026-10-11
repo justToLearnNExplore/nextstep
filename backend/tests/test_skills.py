@@ -192,3 +192,14 @@ def test_after_play_store_the_phone_waits_for_install_without_ai():
     a = res.actions[0]
     assert res.source == "rule" and a.name == "wait_for_app" and a.args["package"] == PKG and "Install" in a.intent
     assert t.ai_calls == 0
+
+
+def test_waits_allowed_for_slow_apps_but_not_forever():
+    from app.agent_loop import guard_repeats
+    from app.store import TaskRecord
+
+    t = TaskRecord(goal="g", language="en-IN", plan=TaskPlan(summary="s", steps=[], operator_goal="g"), consented=True, status="running")
+    wait = lambda: StepResponse(actions=[GatedAction(call_id="c", name="wait", args={"seconds": 2}, gate=Gate.AUTO)])
+    for _ in range(5):
+        assert not guard_repeats(t, wait()).done
+    assert guard_repeats(t, wait()).done  # 6th identical wait: stop

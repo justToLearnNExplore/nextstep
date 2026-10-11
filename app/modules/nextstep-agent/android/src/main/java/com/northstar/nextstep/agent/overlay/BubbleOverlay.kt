@@ -8,14 +8,16 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.GridLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -23,6 +25,7 @@ import com.northstar.nextstep.agent.Prefs
 import com.northstar.nextstep.agent.R
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import kotlin.math.abs
 
 private const val TAP_GUARD_MS = 700L
 
@@ -42,18 +45,20 @@ enum class Style { PRIMARY, OUTLINE, GO, STOP }
 data class PanelButton(val label: String, val style: Style, val onClick: () -> Unit)
 
 interface OverlayHost {
-  fun onOpenApp(key: String)
   fun onUnderstandScreen()
   fun onCheckScam()
-  fun onTalk()
-  fun onCloseNextStep()
+  /** "Tell me": a spoken command about the current screen ("cancel my ride"). */
+  fun onTellMe()
+  fun onOpenNextStep()
+  /** Hide the bubble until the NextStep app is opened again (the helper stays on). */
+  fun onHide()
   fun onStopNow()
 }
 
 /**
- * The always-present NextStep bubble (top-right), its 4-option menu, the app picker and the task
- * panel. Drawn as TYPE_ACCESSIBILITY_OVERLAY windows, so no "draw over other apps" permission is
- * needed and it stays above every app while the accessibility service runs.
+ * The always-present NextStep bubble, its menu (2 big + 3 small buttons) and the task panel.
+ * Drawn as TYPE_ACCESSIBILITY_OVERLAY windows, so no "draw over other apps" permission is needed.
+ * Long-press and drag moves the bubble (position remembered), so it never blocks what's behind it.
  */
 class BubbleOverlay(
   private val service: AccessibilityService,
@@ -64,7 +69,8 @@ class BubbleOverlay(
   private val main = Handler(Looper.getMainLooper())
 
   private var bubbleRoot: LinearLayout? = null
-  private var bubbleRing: FrameLayout? = null
+  private var bubbleParams: WindowManager.LayoutParams? = null
+  private var ring: StatusRing? = null
   private var stopPill: TextView? = null
   private var popup: View? = null
   private var panel: View? = null
@@ -73,52 +79,63 @@ class BubbleOverlay(
    *  previous panel doesn't trigger a different button in the same place. */
   private var panelShownAt = 0L
   private var busy = false
+  private var hiddenInApp = false
+
+  private val screenW get() = service.resources.displayMetrics.widthPixels
+  private val screenH get() = service.resources.displayMetrics.heightPixels
+  private val bubbleSize get() = dp(68)
 
   // ---- lifecycle -------------------------------------------------------------------------
 
   fun show() = main.post {
     if (bubbleRoot != null) return@post
-    val ring = FrameLayout(service).apply {
-      val pad = dp(4)
-      setPadding(pad, pad, pad, pad)
+    val statusRing = StatusRing(service)
+    val head = FrameLayout(service).apply {
+      addView(statusRing, FrameLayout.LayoutParams(bubbleSize, bubbleSize))
       addView(ImageView(service).apply {
         setImageResource(R.drawable.ic_nextstep_logo)
-        contentDescription = t("bubbleA11y", "NextStep. Tap for help.")
-      }, FrameLayout.LayoutParams(dp(60), dp(60)))
-      setOnClickListener { onBubbleTap() }
+        contentDescription = t("bubbleA11y", "NextStep. Tap for help. Press and hold to move.")
+      }, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
     }
-    val stop = pill(t("stopNow", "Stop now"), Style.STOP) { host.onStopNow() }.apply {
-      visibility = View.GONE
-    }
+    val stop = pill(t("stopNow", "Stop now"), Style.STOP) { host.onStopNow() }.apply { visibility = View.GONE }
     val root = LinearLayout(service).apply {
       orientation = LinearLayout.VERTICAL
       gravity = Gravity.CENTER_HORIZONTAL
-      addView(ring)
+      addView(head)
       addView(stop, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
         .apply { topMargin = dp(6) })
     }
-    wm.addView(root, params(Gravity.TOP or Gravity.END, x = dp(10), y = dp(36)))
-    bubbleRoot = root; bubbleRing = ring; stopPill = stop
+    // Default: top-right corner. Remembered after the user moves it.
+    val x = prefs.bubbleX.takeIf { it >= 0 } ?: (screenW - bubbleSize - dp(10))
+    val y = prefs.bubbleY.takeIf { it >= 0 } ?: dp(36)
+    val p = params(Gravity.TOP or Gravity.START, x = x, y = y)
+    attachDrag(head, root, p)
+    wm.addView(root, p)
+    bubbleRoot = root; bubbleParams = p; ring = statusRing; stopPill = stop
+    if (busy) setBusyNow(true)
   }
 
   fun remove() = main.post {
     listOfNotNull(popup, panel, bubbleRoot).forEach { runCatching { wm.removeView(it) } }
-    popup = null; panel = null; bubbleRoot = null
+    popup = null; panel = null; bubbleRoot = null; ring = null
   }
 
   /** Hides only the bubble (e.g. while the NextStep app itself is open); panels are unaffected. */
   fun setBubbleHidden(hidden: Boolean) = main.post {
+    hiddenInApp = hidden
     bubbleRoot?.visibility = if (hidden && !busy) View.GONE else View.VISIBLE
   }
 
-  /** Green dashed ring + red Stop pill while a task is running. */
-  fun setBusy(value: Boolean) = main.post {
+  fun setState(state: BubbleState) = main.post { ring?.state = if (state == BubbleState.IDLE && busy) BubbleState.WORKING else state }
+
+  /** Working ring + Stop pill while a task runs. */
+  fun setBusy(value: Boolean) = main.post { setBusyNow(value) }
+
+  private fun setBusyNow(value: Boolean) {
     busy = value
-    bubbleRing?.background = if (value) GradientDrawable().apply {
-      shape = GradientDrawable.OVAL
-      setStroke(dp(3), Palette.GO, dp(10).toFloat(), dp(4).toFloat())
-    } else null
+    ring?.state = if (value) BubbleState.WORKING else BubbleState.IDLE
     stopPill?.visibility = if (value) View.VISIBLE else View.GONE
+    if (value) bubbleRoot?.visibility = View.VISIBLE else if (hiddenInApp) bubbleRoot?.visibility = View.GONE
   }
 
   /**
@@ -133,18 +150,69 @@ class BubbleOverlay(
   private fun setVisible(v: Boolean) {
     val done = CompletableFuture<Unit>()
     main.post {
-      listOfNotNull(bubbleRoot, popup, panel).forEach { it.visibility = if (v) View.VISIBLE else View.INVISIBLE }
+      listOfNotNull(bubbleRoot, popup, panel).forEach {
+        it.visibility = if (v && !(it === bubbleRoot && hiddenInApp && !busy)) View.VISIBLE
+          else if (v) View.GONE else View.INVISIBLE
+      }
       done.complete(Unit)
     }
     runCatching { done.get(1, TimeUnit.SECONDS) }
     if (!v) Thread.sleep(120) // let the compositor drop the windows before capturing
   }
 
+  // ---- moving the bubble -----------------------------------------------------------------
+
+  /** Tap opens the menu; press-and-hold then drag moves the bubble anywhere. */
+  @SuppressLint("ClickableViewAccessibility")
+  private fun attachDrag(handle: View, root: View, p: WindowManager.LayoutParams) {
+    val longPress = ViewConfiguration.getLongPressTimeout().toLong()
+    val slop = ViewConfiguration.get(service).scaledTouchSlop
+    var downX = 0f; var downY = 0f; var startX = 0; var startY = 0
+    var dragging = false; var moved = false
+    val startDrag = Runnable {
+      dragging = true
+      handle.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+      root.animate().scaleX(1.12f).scaleY(1.12f).setDuration(120).start()
+      closePopupNow()
+    }
+    handle.setOnTouchListener { _, e ->
+      when (e.actionMasked) {
+        MotionEvent.ACTION_DOWN -> {
+          downX = e.rawX; downY = e.rawY; startX = p.x; startY = p.y
+          dragging = false; moved = false
+          main.postDelayed(startDrag, longPress)
+        }
+        MotionEvent.ACTION_MOVE -> {
+          val dx = e.rawX - downX; val dy = e.rawY - downY
+          if (!dragging && (abs(dx) > slop || abs(dy) > slop)) main.removeCallbacks(startDrag)
+          if (dragging) {
+            moved = true
+            p.x = (startX + dx).toInt().coerceIn(0, screenW - bubbleSize)
+            p.y = (startY + dy).toInt().coerceIn(0, screenH - bubbleSize)
+            runCatching { wm.updateViewLayout(root, p) }
+          }
+        }
+        MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+          main.removeCallbacks(startDrag)
+          if (dragging) {
+            root.animate().scaleX(1f).scaleY(1f).setDuration(120).start()
+            if (moved) { prefs.bubbleX = p.x; prefs.bubbleY = p.y }
+          } else if (e.actionMasked == MotionEvent.ACTION_UP &&
+            abs(e.rawX - downX) < slop && abs(e.rawY - downY) < slop) {
+            onBubbleTap()
+          }
+          dragging = false
+        }
+      }
+      true
+    }
+  }
+
   // ---- menu ------------------------------------------------------------------------------
 
   private fun onBubbleTap() {
     when {
-      popup != null -> closePopup()
+      popup != null -> closePopupNow()
       // An accidental tap must never stop or change a task; it only shows status + Stop.
       busy -> showPanel(t("working", "I'm working on it."), emptyList())
       else -> showMenu()
@@ -154,43 +222,20 @@ class BubbleOverlay(
   fun showMenu(): Boolean = main.post {
     closePopupNow()
     val card = card().apply {
-      addView(bigButton(t("openApp", "Open an app"), Style.OUTLINE, "▦") { showApps() })
-      addView(bigButton(t("understand", "Understand this screen"), Style.OUTLINE, "◉") {
+      addView(bigButton(t("understand", "Explain my screen"), Style.OUTLINE, "👁") {
         closePopupNow(); host.onUnderstandScreen()
       })
       addView(bigButton(t("checkScam", "Check for scam"), Style.OUTLINE, "⚠") {
         closePopupNow(); host.onCheckScam()
       })
-      addView(bigButton(t("talk", "Talk to NextStep"), Style.PRIMARY, "●", tall = true) {
-        closePopupNow(); host.onTalk()
+      addView(LinearLayout(service).apply {
+        orientation = LinearLayout.HORIZONTAL
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+          .apply { topMargin = dp(8) }
+        addView(square("🎤", t("tellMe", "Tell me"), Style.PRIMARY) { closePopupNow(); host.onTellMe() })
+        addView(square("⌂", t("openNextStep", "Open app"), Style.OUTLINE) { closePopupNow(); host.onOpenNextStep() })
+        addView(square("✕", t("hideBubble", "Hide"), Style.OUTLINE) { closePopupNow(); host.onHide() })
       })
-      // "✕" renders on every phone; the power symbol was missing from some fonts (showed a box).
-      addView(bigButton(t("close", "Close NextStep"), Style.OUTLINE, "✕", small = true) {
-        closePopupNow(); host.onCloseNextStep()
-      })
-    }
-    showPopup(card)
-  }
-
-  fun showApps(): Boolean = main.post {
-    closePopupNow()
-    val apps = listOf(
-      "whatsapp" to t("appWhatsapp", "WhatsApp"),
-      "phone" to t("appPhone", "Phone"),
-      "camera" to t("appCamera", "Camera"),
-      "youtube" to t("appYoutube", "YouTube"),
-    )
-    val card = card().apply {
-      addView(title(t("openApp", "Open an app")))
-      addView(GridLayout(service).apply {
-        columnCount = 2
-        apps.forEach { (key, label) ->
-          addView(tile(label) { closePopupNow(); host.onOpenApp(key) }, GridLayout.LayoutParams().apply {
-            width = dp(130); height = dp(96); setMargins(dp(4), dp(4), dp(4), dp(4))
-          })
-        }
-      })
-      addView(bigButton(t("back", "Back"), Style.OUTLINE, "←", small = true) { showMenu() })
     }
     showPopup(card)
   }
@@ -202,16 +247,22 @@ class BubbleOverlay(
     popup = null
   }
 
+  /** The menu opens next to the bubble, wherever it has been moved. */
   @SuppressLint("ClickableViewAccessibility")
   private fun showPopup(content: View) {
     content.setOnTouchListener { _, e ->
       if (e.action == MotionEvent.ACTION_OUTSIDE) { closePopupNow(); true } else false
     }
-    val p = params(Gravity.TOP or Gravity.END, x = dp(10), y = dp(110)).apply {
-      flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
-    }
+    val bp = bubbleParams
+    val width = minOf(dp(320), screenW - dp(16))
+    val x = ((bp?.x ?: (screenW - bubbleSize)) + bubbleSize - width).coerceIn(dp(8), screenW - width - dp(8))
+    val below = (bp?.y ?: 0) < screenH / 2
+    val p = if (below) params(Gravity.TOP or Gravity.START, x = x, y = (bp?.y ?: 0) + bubbleSize + dp(8), width = width)
+      else params(Gravity.BOTTOM or Gravity.START, x = x, y = screenH - (bp?.y ?: screenH) + dp(8), width = width)
+    p.flags = p.flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
     wm.addView(content, p)
     popup = content
+    panelShownAt = SystemClock.uptimeMillis()
   }
 
   // ---- task panel ------------------------------------------------------------------------
@@ -228,7 +279,7 @@ class BubbleOverlay(
       closePopupNow()
       panel?.let { runCatching { wm.removeView(it) } }
       val token = ++panelToken
-      panelShownAt = android.os.SystemClock.uptimeMillis()
+      panelShownAt = SystemClock.uptimeMillis()
       val card = card(fill = if (tone == Style.STOP) Palette.AMBER else Palette.PAPER).apply {
         addView(TextView(service).apply {
           text = message
@@ -321,18 +372,24 @@ class BubbleOverlay(
       .apply { topMargin = dp(8) }
     isClickable = true
     setOnClickListener {
-      if (android.os.SystemClock.uptimeMillis() - panelShownAt >= TAP_GUARD_MS) onClick()
+      if (SystemClock.uptimeMillis() - panelShownAt >= TAP_GUARD_MS) onClick()
     }
   }
 
-  private fun tile(label: String, onClick: () -> Unit) = TextView(service).apply {
-    text = label
-    setTextColor(Palette.INK)
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, 19f)
+  /** Small square menu button: icon above a short label. */
+  private fun square(icon: String, label: String, style: Style, onClick: () -> Unit) = TextView(service).apply {
+    val (bg, fg) = colors(style)
+    text = "$icon\n$label"
+    setTextColor(fg)
+    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
     typeface = Typeface.DEFAULT_BOLD
     gravity = Gravity.CENTER
-    background = rounded(Color.WHITE, Palette.INK, 14)
-    setOnClickListener { onClick() }
+    background = rounded(bg, if (style == Style.OUTLINE) Palette.INK else null, 14)
+    minHeight = dp(84)
+    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+      marginStart = dp(4); marginEnd = dp(4)
+    }
+    setOnClickListener { if (SystemClock.uptimeMillis() - panelShownAt >= TAP_GUARD_MS) onClick() }
   }
 
   private fun pill(label: String, style: Style, onClick: () -> Unit) = TextView(service).apply {

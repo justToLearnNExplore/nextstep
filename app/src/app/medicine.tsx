@@ -101,10 +101,16 @@ export default function Medicine() {
     setPhase('camera');
   };
 
-  const send = (who: Recipient) => {
-    const c = contacts[who];
+  const sendToDoctor = () => {
+    const c = contacts.doctor;
     if (!photo || !c) return;
     NextStepAgent.shareImageToWhatsApp(photo.path, c.phone, info?.caption || t('captionFallback'), c.name);
+  };
+
+  /** Any WhatsApp chat: WhatsApp's own contact picker opens; NextStep never sends without a yes. */
+  const shareOnWhatsApp = () => {
+    if (!photo) return;
+    NextStepAgent.shareImageToWhatsApp(photo.path, null, info?.caption || t('captionFallback'), 'WhatsApp');
   };
 
   if (error) {
@@ -162,8 +168,6 @@ export default function Medicine() {
     );
   }
 
-  const order: Recipient[] = to === 'family' ? ['family', 'doctor'] : ['doctor', 'family'];
-  const available = order.filter((w) => contacts[w]);
 
   return (
     <Screen>
@@ -182,21 +186,15 @@ export default function Medicine() {
             {info && !info.readable ? (
               <BigButton label={t('retake')} icon="camera-retake" onPress={retake} />
             ) : null}
-            {available.map((who) => (
-              <BigButton
-                key={who}
-                label={t('sendTo').replace('{name}', contacts[who]!.name)}
-                icon="whatsapp"
-                tone="go"
-                onPress={() => send(who)}
-              />
-            ))}
-            {available.length === 0 ? (
+            {contacts.doctor ? (
+              <BigButton label={t('sendToDoctor')} icon="stethoscope" tone="go" tall onPress={sendToDoctor} />
+            ) : (
               <>
                 <Body>{t('noContacts')}</Body>
-                <BigButton label={t('openSettings')} icon="cog" onPress={() => router.push('/settings')} />
+                <BigButton label={t('openSettings')} icon="cog" tone="outline" onPress={() => router.push('/settings')} />
               </>
-            ) : null}
+            )}
+            <BigButton label={t('shareOnWhatsApp')} icon="whatsapp" tone="outline" onPress={shareOnWhatsApp} />
             {info?.readable !== false ? (
               <BigButton label={t('retake')} icon="camera-retake" tone="outline" onPress={retake} />
             ) : null}

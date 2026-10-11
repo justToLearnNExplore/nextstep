@@ -1,6 +1,6 @@
 import { NativeModule, requireNativeModule } from 'expo';
 
-import type { Heard, NextStepAgentEvents, NextStepConfig } from './NextStepAgent.types';
+import type { AudioState, Heard, NextStepAgentEvents, NextStepConfig, RecentActivity } from './NextStepAgent.types';
 
 declare class NextStepAgentModule extends NativeModule<NextStepAgentEvents> {
   isAccessibilityEnabled(): boolean;
@@ -15,6 +15,11 @@ declare class NextStepAgentModule extends NativeModule<NextStepAgentEvents> {
   hideBubble(): void;
   /** Opens the recipient's WhatsApp chat with the photo; the overlay asks before tapping Send. */
   shareImageToWhatsApp(path: string, phone: string | null, caption: string, recipientName: string): void;
+  getAudioState(): AudioState;
+  /** "media" or "ringer". Returns "ok" or "needs_access" (Do Not Disturb access required). */
+  fixSound(kind: 'media' | 'ringer'): 'ok' | 'needs_access';
+  openDoNotDisturbAccess(): void;
+  getRecentActivity(sinceMs: number): Promise<RecentActivity>;
   isAppInstalled(packageName: string): boolean;
   minimizeApp(): void;
   listenOnce(language: string): Promise<Heard>;

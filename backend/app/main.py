@@ -9,9 +9,12 @@ from typing import TypeVar
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from typing import Any
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from . import agent_loop, family
+from .agents.assistants import GroceryList, Missed, read_grocery_list, summarise_missed
 from .agents.explainer import explain_screen
 from .agents.medicine_reader import read_medicine
 from .agents.planner import plan_task
@@ -265,6 +268,29 @@ async def stt(req: SttRequest, user: str = Depends(senior)) -> SttResponse:
     text = await transcribe(req.audio_b64, req.language, req.sample_rate)
     log.info("stt lang=%s chars=%d diag=%s", req.language, len(text), req.diag)
     return SttResponse(text=text)
+
+
+class GroceryPhotoRequest(BaseModel):
+    language: str = "en-IN"
+    image_b64: str
+
+
+class MissedRequest(BaseModel):
+    language: str = "en-IN"
+    calls: list[dict[str, Any]] = []
+    messages: list[dict[str, Any]] = []
+
+
+@app.post("/v1/grocery/list", response_model=GroceryList)
+async def grocery_list(req: GroceryPhotoRequest, user: str = Depends(senior)) -> GroceryList:
+    """Photo of a handwritten list -> items. The photo is not stored."""
+    return await within(settings.agent_budget_s, read_grocery_list(req.image_b64, req.language))
+
+
+@app.post("/v1/phone/missed", response_model=Missed)
+async def phone_missed(req: MissedRequest, user: str = Depends(senior)) -> Missed:
+    """'What did I miss in the last hour?' Calls/messages are summarised in memory, never stored."""
+    return await within(settings.agent_budget_s, summarise_missed(req.language, req.calls, req.messages))
 
 
 @app.post("/v1/events")

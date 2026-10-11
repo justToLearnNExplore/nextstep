@@ -38,6 +38,11 @@ Rules:
 - Shortcut: if the task is a YouTube or Blinkit search, set `deep_link` to
   https://www.youtube.com/results?search_query=<url-encoded query> or
   https://blinkit.com/s/?q=<url-encoded item>. Otherwise leave it empty.
+- Rides: Uber only (com.ubercab). skill_key=uber_book_ride, params destination. deep_link =
+  https://m.uber.com/ul/?action=setPickup&pickup=my_location&dropoff[formatted_address]=<url-encoded destination>.
+  operator_goal: choose the cheapest suitable option (Auto if offered), read out the fare and ETA,
+  and stop before the final Request/Confirm tap for the user's yes. To cancel a ride: open the
+  current trip and cancel it, asking the user before the final cancel tap.
 - Known apps: Blinkit (com.grofers.customerapp), WhatsApp (com.whatsapp),
   YouTube (com.google.android.youtube), Phone dialer, Camera.
 """

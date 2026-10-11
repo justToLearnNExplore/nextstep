@@ -9,6 +9,7 @@ import { useI18n } from '../i18n';
 import { configureAgent, NextStepAgent } from '../lib/agent';
 import { type Contact, type Recipient, useContacts } from '../lib/contacts';
 import { getIdentity } from '../lib/identity';
+import { getHomeAddress, saveHomeAddress } from '../lib/places';
 import { colors, fonts, size } from '../theme';
 
 export default function Settings() {
@@ -72,6 +73,7 @@ export default function Settings() {
           <>
             <ContactEditor title={t('myDoctor')} who="doctor" initial={contacts.doctor} onSave={save} />
             <ContactEditor title={t('myFamily')} who="family" initial={contacts.family} onSave={save} />
+            <HomeAddress />
           </>
         ) : null}
 
@@ -81,6 +83,36 @@ export default function Settings() {
         <BigButton label={t('back')} icon="arrow-left" onPress={() => router.back()} />
       </ScrollView>
     </Screen>
+  );
+}
+
+/** Home address, for "Take me home" in Book a ride. */
+function HomeAddress() {
+  const { t } = useI18n();
+  const [address, setAddress] = useState('');
+  const [saved, setSaved] = useState(false);
+  useEffect(() => {
+    getHomeAddress().then((a) => a && setAddress(a));
+  }, []);
+  return (
+    <View style={styles.contact}>
+      <Body style={styles.label}>{t('homeAddress')}</Body>
+      <TextInput
+        value={address}
+        onChangeText={(v) => (setAddress(v), setSaved(false))}
+        placeholder={t('homeAddressPlaceholder')}
+        accessibilityLabel={t('homeAddress')}
+        style={styles.input}
+        placeholderTextColor="#5F6B76"
+        multiline
+      />
+      <BigButton
+        label={saved ? t('saved') : t('save')}
+        icon={saved ? 'check' : 'content-save'}
+        tone={saved ? 'go' : 'outline'}
+        onPress={() => saveHomeAddress(address).then(() => setSaved(true))}
+      />
+    </View>
   );
 }
 

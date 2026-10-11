@@ -205,11 +205,16 @@ class ActionExecutor(private val service: AccessibilityService) {
   private fun ok() = JSONObject().put("ok", true)
 
   companion object {
-    val LINK_APPS = mapOf("blinkit.com" to "com.grofers.customerapp", "youtube.com" to "com.google.android.youtube")
+    val LINK_APPS = mapOf(
+      "blinkit.com" to "com.grofers.customerapp",
+      "youtube.com" to "com.google.android.youtube",
+      "m.uber.com" to "com.ubercab",
+    )
     val LINK_ALLOWLIST = listOf(
       "https://www.youtube.com/results?search_query=",
       "https://m.youtube.com/results?search_query=",
       "https://blinkit.com/s/?q=",
+      "https://m.uber.com/ul/?action=setPickup",
     )
   }
   private fun err(e: String) = JSONObject().put("ok", false).put("error", e)

@@ -105,6 +105,14 @@ class NextStepAgentModule : Module() {
       Unit
     }
 
+    // ---- phone help ----
+    Function("getAudioState") { PhoneHelp(context).audioState() }
+    Function("fixSound") { kind: String -> PhoneHelp(context).fixSound(kind) }
+    Function("openDoNotDisturbAccess") {
+      context.startActivity(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+    AsyncFunction("getRecentActivity") { sinceMs: Double -> PhoneHelp(context).recentActivity(sinceMs.toLong()) }
+
     Function("isAppInstalled") { pkg: String ->
       runCatching { context.packageManager.getPackageInfo(pkg, 0); true }.getOrDefault(false)
     }

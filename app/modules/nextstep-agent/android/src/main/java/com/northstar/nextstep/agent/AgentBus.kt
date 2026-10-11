@@ -66,6 +66,15 @@ class Prefs(context: Context) {
     get() = sp.getString("labels", "{}")!!
     set(v) = sp.edit().putString("labels", v).apply()
 
+  /** Bubble position (px), -1 = default top-right. */
+  var bubbleX: Int
+    get() = sp.getInt("bubbleX", -1)
+    set(v) = sp.edit().putInt("bubbleX", v).apply()
+
+  var bubbleY: Int
+    get() = sp.getInt("bubbleY", -1)
+    set(v) = sp.edit().putInt("bubbleY", v).apply()
+
   var scamCheckEnabled: Boolean
     get() = sp.getBoolean("scamCheckEnabled", false)
     set(v) = sp.edit().putBoolean("scamCheckEnabled", v).apply()

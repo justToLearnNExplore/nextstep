@@ -129,6 +129,7 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
 
 
 MAX_REPEATS = 2
+MAX_WAITS = 5
 
 
 def guard_repeats(task: TaskRecord, res: StepResponse) -> StepResponse:
@@ -140,11 +141,13 @@ def guard_repeats(task: TaskRecord, res: StepResponse) -> StepResponse:
     sig = f"{a.name}:{sorted((k, str(v)) for k, v in a.args.items() if k in ('x', 'y', 'url', 'text', 'app_name'))}"
     task.repeats = task.repeats + 1 if sig == task.last_signature else 0
     task.last_signature = sig
-    if task.repeats >= MAX_REPEATS:
+    # Slow splash screens: a few waits in a row are normal; other repeats mean the agent is stuck.
+    limit = MAX_WAITS if a.name == "wait" else MAX_REPEATS
+    if task.repeats >= limit:
         log.warning("task %s stopped: action repeated %d times (%s)", task.id, task.repeats + 1, a.name)
         task.status = "failed"
         return StepResponse(done=True, message="", source="ai")
-    if task.repeats == 1:
+    if task.repeats == 1 and a.name != "wait":
         task.last_failed = True  # next turn: higher thinking + full screenshot + "try another way"
     return res
 

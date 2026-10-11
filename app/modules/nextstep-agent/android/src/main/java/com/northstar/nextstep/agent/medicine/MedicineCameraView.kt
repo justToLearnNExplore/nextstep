@@ -33,6 +33,10 @@ import java.util.concurrent.Executors
  */
 class MedicineCameraView(context: Context, appContext: AppContext) : ExpoView(context, appContext) {
 
+  // Without this React Native never measures the native PreviewView child, so it stays 0x0 and
+  // the senior sees a black screen (seen on a moto g8).
+  override val shouldUseAndroidLayout = true
+
   private val onGuidance by EventDispatcher()
   private val onCameraError by EventDispatcher()
 

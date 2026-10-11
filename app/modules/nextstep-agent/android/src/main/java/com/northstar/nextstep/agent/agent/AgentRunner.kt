@@ -239,6 +239,27 @@ class AgentRunner(
   }
 
   /**
+   * "Tell me" from the bubble: one spoken command about whatever is on screen, e.g. "cancel my
+   * ride" in Uber or "make the text bigger". Runs as a normal task (plan, approval, gates).
+   */
+  fun tellMe() = worker.execute {
+    if (isRunning) return@execute
+    overlay.showPanel(t("tellMePrompt", "What should I do here?"), emptyList())
+    voice.speakAndWait(t("tellMePrompt", "What should I do here?"), lang)
+    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.LISTENING)
+    overlay.showPanel(t("listening", "I'm listening…"), emptyList())
+    val heard = voice.listenAndWait(lang)
+    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.IDLE)
+    val text = heard.text
+    if (text.isNullOrBlank()) {
+      say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" }, "I didn't hear that."))
+      return@execute
+    }
+    overlay.hidePanel()
+    startTask(text)
+  }
+
+  /**
    * "Check for scam" from the bubble: reads the messages on the current screen (any app), asks
    * the scam shield, and tells the user. Offers only the verified official site, never the link
    * from the message.
@@ -284,19 +305,6 @@ class AgentRunner(
       overlay.showPanel(res.getString("warning"), buttons, Style.STOP)
       voice.speak(res.getString("warning"), lang)
     }.onFailure { Log.e(TAG, "scam check failed", it) }
-  }
-
-  fun openQuickApp(key: String) = worker.execute {
-    val intent = when (key) {
-      "phone" -> Intent(Intent.ACTION_DIAL)
-      "camera" -> Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)
-      "whatsapp" -> service.packageManager.getLaunchIntentForPackage("com.whatsapp")
-      "youtube" -> service.packageManager.getLaunchIntentForPackage("com.google.android.youtube")
-      else -> null
-    }
-    if (intent == null) { say(t("appMissing", "That app is not installed."), finalMessage = true); return@execute }
-    service.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    log("open_app", JSONObject().put("app", key))
   }
 
   /**
@@ -385,6 +393,7 @@ class AgentRunner(
     )
     if (taskId != null) buttons += changeButton { changeRequested = true; respond(false) }
     overlay.showPanel(message, buttons, steps = steps)
+    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.WAITING)
     val spoken = CompletableFuture<Unit>()
     voice.speak((listOf(message) + steps).joinToString(". "), lang) { spoken.complete(Unit) }
     runCatching { CompletableFuture.anyOf(spoken, decision).get(60, java.util.concurrent.TimeUnit.SECONDS) }
@@ -401,6 +410,7 @@ class AgentRunner(
       }
     }
     val answer = runCatching { decision.get() }.getOrDefault(false)
+    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.IDLE)
     voice.cancelListening()
     pendingDecision = null
     overlay.hidePanel()
@@ -425,24 +435,42 @@ class AgentRunner(
    * The user wants to change the task mid-way: listen (unless we already heard it), send it to
    * the operator, and confirm back what we understood. Runs on the worker thread.
    */
+  /**
+   * The user wants to add or change something mid-task. We show and read back what we heard and
+   * only send it after a yes ("You said: also add bread. Is that right?"), so a mishearing never
+   * silently changes the task. Runs on the worker thread.
+   */
   private fun takeChange(id: String, announce: Boolean = true): String? {
     changeRequested = false
-    val text = heardChange ?: run {
-      overlay.showPanel(t("sayChangePrompt", "Tell me what to change."), emptyList())
-      voice.speakAndWait(t("sayChangePrompt", "Tell me what to change."), lang)
-      overlay.showPanel(t("listening", "I'm listening…"), emptyList())
-      val heard = voice.listenAndWait(lang)
-      heard.text ?: run {
-        say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" },
-          "I didn't hear that."))
-        return null
-      }
-    }
+    var text = heardChange ?: listenForChange() ?: return null
     heardChange = null
-    return runCatching { api.post("/v1/tasks/$id/instruct", JSONObject().put("text", text)) }
-      .onSuccess { if (announce) say(t("changeHeard", "Got it: “{text}”. I'll do that.").replace("{text}", text)) }
-      .onFailure { Log.e(TAG, "instruct failed", it); say(explain(it as? Exception ?: Exception(it))) }
-      .map { text }.getOrNull()
+    repeat(3) {
+      val ok = ask(t("changeCheck", "You said: “{text}”. Is that right?").replace("{text}", text),
+        t("yes", "Yes"), t("tryAgain", "Try again"))
+      if (ok) {
+        return runCatching { api.post("/v1/tasks/$id/instruct", JSONObject().put("text", text)) }
+          .onSuccess { if (announce) say(t("changeHeard", "Got it: “{text}”. I'll do that.").replace("{text}", text)) }
+          .onFailure { Log.e(TAG, "instruct failed", it); say(explain(it as? Exception ?: Exception(it))) }
+          .map { text }.getOrNull()
+      }
+      changeRequested = false
+      text = heardChange?.also { heardChange = null } ?: listenForChange() ?: return null
+    }
+    return null
+  }
+
+  private fun listenForChange(): String? {
+    overlay.showPanel(t("sayChangePrompt", "What would you like to add or change?"), emptyList())
+    voice.speakAndWait(t("sayChangePrompt", "What would you like to add or change?"), lang)
+    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.LISTENING)
+    overlay.showPanel(t("listening", "I'm listening…"), emptyList())
+    val heard = voice.listenAndWait(lang)
+    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.IDLE)
+    return heard.text?.takeIf { it.isNotBlank() } ?: run {
+      say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" },
+        "I didn't hear that."))
+      null
+    }
   }
 
   private fun yesNo(heard: String): Boolean? {

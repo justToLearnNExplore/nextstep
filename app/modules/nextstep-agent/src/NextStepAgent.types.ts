@@ -41,3 +41,20 @@ export type NextStepAgentEvents = {
 /** Result of one listen. `error` is null when `text` was heard. */
 export type HeardError = 'silence' | 'mic_silent' | 'mic_unavailable' | 'permission' | 'network' | 'busy' | 'cancelled';
 export type Heard = { text: string | null; error: HeardError | null };
+
+export type AudioState = {
+  mediaVolume: number;
+  mediaMax: number;
+  ringVolume: number;
+  ringMax: number;
+  ringerMode: 'normal' | 'vibrate' | 'silent';
+  doNotDisturb: boolean;
+  policyAccess: boolean;
+};
+
+export type RecentActivity = {
+  calls: { number?: string; name?: string | null; at: number }[];
+  messages: { app: string; from?: string | null; text: string; at: number }[];
+  callLogAllowed: boolean;
+  smsAllowed: boolean;
+};

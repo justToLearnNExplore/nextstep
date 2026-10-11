@@ -15,6 +15,15 @@ type Phase = 'ask' | 'listening' | 'confirm' | 'typing' | 'saving';
  * "What should I call you?" → speak → "Did I hear Kamala right?" → yes → account created.
  * No username, password or OTP: the name is the only thing the senior ever provides.
  */
+/** True if what was "heard" is mostly NextStep's own prompt (the mic picked up the speaker). */
+function isEcho(heard: string, prompts: string[]): boolean {
+  const words = (s: string) => s.toLowerCase().split(/[\s,.?!।“”"]+/).filter((w) => w.length > 1);
+  const h = words(heard);
+  if (!h.length) return false;
+  const p = new Set(prompts.flatMap(words));
+  return h.filter((w) => p.has(w)).length / h.length >= 0.5;
+}
+
 export function NameCapture({ initial, onDone }: { initial?: string; onDone: (name: string) => void }) {
   const { t, lang } = useI18n();
   const [phase, setPhase] = useState<Phase>('ask');
@@ -38,8 +47,11 @@ export function NameCapture({ initial, onDone }: { initial?: string; onDone: (na
     setError(null);
     setPhase('listening');
     await ensureAccount().catch(() => {});
+    // Let NextStep's own voice fully stop first, or the mic records "What should I call you?".
+    await new Promise((r) => setTimeout(r, 450));
     const heard = await NextStepAgent.listenOnce(lang.tag).catch(() => ({ text: null, error: 'network' as const }));
-    const n = heard.text ? extractName(heard.text, lang.strings.namePrefixes, lang.strings.nameSuffixes) : '';
+    const echoed = heard.text && isEcho(heard.text, [t('askName'), t('askNameHint'), t('didIHear')]);
+    const n = heard.text && !echoed ? extractName(heard.text, lang.strings.namePrefixes, lang.strings.nameSuffixes) : '';
     if (!n) {
       const msg = t(heardErrorKey(heard.error));
       setPhase('ask');

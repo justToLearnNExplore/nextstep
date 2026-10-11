@@ -27,6 +27,7 @@ MESSAGE_APPS = {"com.whatsapp", "com.whatsapp.w4b", "com.google.android.apps.mes
 IRREVERSIBLE = re.compile(
     r"(place order|confirm order|order now|\bpay\b|proceed to pay|make payment|\bsend\b|\bshare\b|"
     r"install|uninstall|delete|remove account|transfer|buy now|submit|add address|save address|"
+    r"request (uber|ride|auto|moto|go)|book (now|ride|auto)|\bconfirm (uber|auto|moto|go|ride|booking)|cancel (ride|trip)|"
     r"भेजें|भेजो|ऑर्डर करें|भुगतान|इंस्टॉल|हटाएं|"
     r"ಕಳುಹಿಸು|ಕಳುಹಿಸಿ|ಆರ್ಡರ್ ಮಾಡಿ|ಪಾವತಿ|ಸ್ಥಾಪಿಸು)",
     re.I,
@@ -44,6 +45,7 @@ ALLOWED_LINK_PREFIXES = (
     "https://www.youtube.com/results?search_query=",
     "https://m.youtube.com/results?search_query=",
     "https://blinkit.com/s/?q=",
+    "https://m.uber.com/ul/?action=setPickup",
 )
 
 DIGITS_ONLY = re.compile(r"^\s*\d{4,8}\s*$")

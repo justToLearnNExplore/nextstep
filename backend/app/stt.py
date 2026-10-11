@@ -13,7 +13,9 @@ from .i18n import language
 _client: speech.SpeechAsyncClient | None = None
 
 # App and task words seniors say often; boosts recognition of brand names.
-_HINTS = ["Blinkit", "WhatsApp", "YouTube", "NextStep", "milk", "medicine", "bhajan", "doctor", "order"]
+ALTERNATES = {"en-IN": ["hi-IN"], "hi-IN": ["en-IN"], "kn-IN": ["en-IN"]}
+
+_HINTS = ["Uber", "Phoenix", "Blinkit", "WhatsApp", "YouTube", "NextStep", "milk", "medicine", "bhajan", "doctor", "order"]
 
 
 def client() -> speech.SpeechAsyncClient:
@@ -31,8 +33,10 @@ def config(lang_tag: str, sample_rate: int) -> speech.RecognitionConfig:
         enable_automatic_punctuation=True,
         speech_contexts=[speech.SpeechContext(phrases=_HINTS)],
     )
+    # Seniors mix languages ("Uber book karo"); let Speech-to-Text pick between them.
+    cfg.alternative_language_codes = [c for c in ALTERNATES.get(cfg.language_code, []) if c != cfg.language_code]
     # latest_long is markedly better for Indian English; the default model is best for hi/kn.
-    if cfg.language_code.startswith("en"):
+    if cfg.language_code.startswith("en") and not cfg.alternative_language_codes:
         cfg.model = "latest_long"
     return cfg
 

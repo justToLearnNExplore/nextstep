@@ -45,6 +45,8 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
     if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED || event.packageName == null) return
     val inOurApp = event.packageName == packageName && event.className?.toString()?.endsWith("MainActivity") == true
     if (inOurApp) {
+      // Opening NextStep always brings the bubble back if the user had hidden it.
+      if (!prefs.overlayEnabled) { prefs.overlayEnabled = true; overlay.show() }
       // Inside NextStep itself the bubble isn't needed (and would cover the Settings button).
       overlay.setBubbleHidden(true)
     } else if (event.packageName != packageName) {
@@ -65,23 +67,27 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
 
   // ---- OverlayHost -----------------------------------------------------------------------
 
-  override fun onOpenApp(key: String) = runner.openQuickApp(key)
-
   override fun onUnderstandScreen() = runner.understandScreen()
 
   override fun onCheckScam() = runner.checkScreenForScam()
 
-  /** Opens the NextStep "Talk" screen (picture shortcuts + big mic) in the React Native app. */
-  override fun onTalk() {
-    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("nextstep://talk"))
-      .setPackage(packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
+  override fun onTellMe() = runner.tellMe()
+
+  override fun onOpenNextStep() {
+    packageManager.getLaunchIntentForPackage(packageName)
+      ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+      ?.let(::startActivity)
   }
 
-  /** "Close NextStep": stops any task, removes the bubble and turns the service off. */
-  override fun onCloseNextStep() {
+  /**
+   * "Hide": removes only the bubble. The helper stays on, so opening the NextStep app brings the
+   * bubble straight back (the old Close turned the whole service off, which only Android Settings
+   * could undo).
+   */
+  override fun onHide() {
     if (runner.isRunning) runner.stop()
+    prefs.overlayEnabled = false
     overlay.remove()
-    disableSelf()
   }
 
   override fun onStopNow() = runner.stop()
