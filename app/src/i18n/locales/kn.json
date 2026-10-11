@@ -136,6 +136,7 @@
   "sayChange": "🎤 ಬೇರೆ ಏನಾದರೂ ಹೇಳಿ",
   "sayChangePrompt": "ಏನು ಬದಲಿಸಬೇಕು ಹೇಳಿ.",
   "changeHeard": "ಅರ್ಥವಾಯಿತು: “{text}”. ಹಾಗೇ ಮಾಡುತ್ತೇನೆ.",
+  "changeConfirm": "ಅರ್ಥವಾಯಿತು: “{text}”. ಮುಂದುವರಿಯಲೇ?",
   "namePrefixes": [
     "ನನ್ನ ಹೆಸರು",
     "ನಾನು",

@@ -24,6 +24,8 @@ import com.northstar.nextstep.agent.R
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 
+private const val TAP_GUARD_MS = 700L
+
 /** Brand palette, tuned for ageing eyes (AAA contrast; no pale blue/green distinctions). */
 object Palette {
   val INK = Color.parseColor("#12263A")
@@ -67,6 +69,9 @@ class BubbleOverlay(
   private var popup: View? = null
   private var panel: View? = null
   private var panelToken = 0
+  /** Taps on a panel that just appeared are ignored briefly, so a second or shaky tap meant for the
+   *  previous panel doesn't trigger a different button in the same place. */
+  private var panelShownAt = 0L
   private var busy = false
 
   // ---- lifecycle -------------------------------------------------------------------------
@@ -223,6 +228,7 @@ class BubbleOverlay(
       closePopupNow()
       panel?.let { runCatching { wm.removeView(it) } }
       val token = ++panelToken
+      panelShownAt = android.os.SystemClock.uptimeMillis()
       val card = card(fill = if (tone == Style.STOP) Palette.AMBER else Palette.PAPER).apply {
         addView(TextView(service).apply {
           text = message
@@ -314,7 +320,9 @@ class BubbleOverlay(
     layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
       .apply { topMargin = dp(8) }
     isClickable = true
-    setOnClickListener { onClick() }
+    setOnClickListener {
+      if (android.os.SystemClock.uptimeMillis() - panelShownAt >= TAP_GUARD_MS) onClick()
+    }
   }
 
   private fun tile(label: String, onClick: () -> Unit) = TextView(service).apply {

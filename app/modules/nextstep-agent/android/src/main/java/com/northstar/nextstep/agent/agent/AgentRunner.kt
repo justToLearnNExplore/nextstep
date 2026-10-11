@@ -90,7 +90,16 @@ class AgentRunner(
       val summary = plan.getString("summary").let {
         if (res.optBoolean("uses_saved_routine")) "${t("savedRoutine", "I've done this before, so it will be quick.")} $it" else it
       }
-      val approved = ask(summary, t("yesDoIt", "Yes, do it"), t("no", "No"), steps)
+      var approved = ask(summary, t("yesDoIt", "Yes, do it"), t("no", "No"), steps)
+      // "Say something else" at the plan: take the change, then ask again (never cancel).
+      while (!approved && changeRequested && !stopped.get()) {
+        val said = takeChange(id, announce = false)
+        approved = if (said != null) {
+          ask(t("changeConfirm", "Got it: “{text}”. Shall I go ahead?").replace("{text}", said), t("yesDoIt", "Yes, do it"), t("no", "No"))
+        } else {
+          ask(summary, t("yesDoIt", "Yes, do it"), t("no", "No"), steps)  // didn't catch it: ask again
+        }
+      }
       api.post("/v1/tasks/$id/consent", JSONObject().put("approved", approved))
       if (!approved) { say(t("okCancelled", "Okay, I won't do it."), finalMessage = true); return@execute }
 
@@ -383,7 +392,7 @@ class AgentRunner(
       voice.listen(lang) { heard ->
         val text = heard.text ?: return@listen
         when (val yn = yesNo(text)) {
-          null -> if (taskId != null && text.length > 3) {
+          null -> if (taskId != null && isInstruction(text, message)) {
             // Not a yes/no: the user is telling us something else ("also add bread").
             heardChange = text; changeRequested = true; decision.complete(false)
           }
@@ -399,6 +408,16 @@ class AgentRunner(
     return answer && !stopped.get()
   }
 
+  /** A real request, not noise or NextStep's own voice echoing back into the mic. */
+  private fun isInstruction(heard: String, spoken: String): Boolean {
+    val words = heard.trim().split(Regex("\\s+")).filter { it.length > 1 }
+    if (words.size < 2) return false
+    // Split on spaces/punctuation only: \W would break Hindi and Kannada words apart.
+    val spokenWords = spoken.lowercase().split(Regex("[\\s,.?!।“”\"]+")).toSet()
+    val echoed = words.count { it.lowercase().trim(',', '.', '?', '!') in spokenWords }
+    return echoed.toDouble() / words.size < 0.6
+  }
+
   private fun changeButton(onTap: () -> Unit) =
     PanelButton(t("sayChange", "🎤 Say something else"), Style.OUTLINE) { voice.stopSpeaking(); onTap() }
 
@@ -406,7 +425,7 @@ class AgentRunner(
    * The user wants to change the task mid-way: listen (unless we already heard it), send it to
    * the operator, and confirm back what we understood. Runs on the worker thread.
    */
-  private fun takeChange(id: String) {
+  private fun takeChange(id: String, announce: Boolean = true): String? {
     changeRequested = false
     val text = heardChange ?: run {
       overlay.showPanel(t("sayChangePrompt", "Tell me what to change."), emptyList())
@@ -416,13 +435,14 @@ class AgentRunner(
       heard.text ?: run {
         say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" },
           "I didn't hear that."))
-        return
+        return null
       }
     }
     heardChange = null
-    runCatching { api.post("/v1/tasks/$id/instruct", JSONObject().put("text", text)) }
-      .onSuccess { say(t("changeHeard", "Got it: “{text}”. I'll do that.").replace("{text}", text)) }
+    return runCatching { api.post("/v1/tasks/$id/instruct", JSONObject().put("text", text)) }
+      .onSuccess { if (announce) say(t("changeHeard", "Got it: “{text}”. I'll do that.").replace("{text}", text)) }
       .onFailure { Log.e(TAG, "instruct failed", it); say(explain(it as? Exception ?: Exception(it))) }
+      .map { text }.getOrNull()
   }
 
   private fun yesNo(heard: String): Boolean? {

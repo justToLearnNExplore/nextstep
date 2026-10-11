@@ -136,6 +136,7 @@
   "sayChange": "🎤 कुछ और बोलें",
   "sayChangePrompt": "बताइए क्या बदलना है।",
   "changeHeard": "समझ गया: “{text}”। मैं यही करूँगा।",
+  "changeConfirm": "समझ गया: “{text}”। क्या मैं आगे बढ़ूँ?",
   "namePrefixes": [
     "मेरा नाम",
     "मैं हूँ",

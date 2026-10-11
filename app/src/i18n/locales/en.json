@@ -136,6 +136,7 @@
   "sayChange": "🎤 Say something else",
   "sayChangePrompt": "Tell me what to change.",
   "changeHeard": "Got it: “{text}”. I'll do that.",
+  "changeConfirm": "Got it: “{text}”. Shall I go ahead?",
   "namePrefixes": [
     "my name is",
     "my name's",
