@@ -177,3 +177,18 @@ def test_choosing_cash_on_delivery_is_routine_but_placing_order_asks():
     cod = classify("click", {"x": 500, "y": 770}, s, "en-IN", True)
     place = classify("click", {"x": 500, "y": 937}, s, "en-IN", True)
     assert cod.gate == Gate.AUTO and place.gate == Gate.CONFIRM
+
+
+def test_after_play_store_the_phone_waits_for_install_without_ai():
+    from app.agent_loop import absorb_results, decide
+    from app.store import TaskRecord
+    import asyncio
+
+    store = MemoryStore()
+    t = TaskRecord(goal="g", language="hi-IN", plan=TaskPlan(summary="s", steps=[], operator_goal="g", target_package=PKG), consented=True, status="running")
+    t.pending["c1"] = {"name": "open_play_store", "intent": "Install Blinkit", "package": PKG}
+    absorb_results(t, [{"call_id": "c1", "name": "open_play_store", "result": {"ok": True, "safety_acknowledgement": True}}])
+    res = asyncio.run(decide(store, t, Screen(package="com.android.vending", width=1000, height=2000)))
+    a = res.actions[0]
+    assert res.source == "rule" and a.name == "wait_for_app" and a.args["package"] == PKG and "Install" in a.intent
+    assert t.ai_calls == 0

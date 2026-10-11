@@ -37,6 +37,7 @@ class ActionExecutor(private val service: AccessibilityService) {
       "take_screenshot" -> ok()
       "open_play_store" -> openPlayStore(args.getString("package"))
       "open_link" -> openLink(args.getString("url"))
+      "wait_for_app" -> waitForApp(args.getString("package"), args.optLong("timeout_s", 180))
       "go_home" -> global(AccessibilityService.GLOBAL_ACTION_HOME)
       else -> err("unsupported_action:$name")
     }
@@ -137,9 +138,32 @@ class ActionExecutor(private val service: AccessibilityService) {
   /** Allowlisted search deep links (checked by the server Guardian and again here). */
   private fun openLink(url: String): JSONObject {
     if (LINK_ALLOWLIST.none { url.startsWith(it) }) return err("link_not_allowed")
-    service.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    // Send the link straight to its app (no "Open with" chooser for the senior to deal with).
+    LINK_APPS.entries.firstOrNull { url.contains(it.key) }?.value?.takeIf(::isInstalled)?.let(intent::setPackage)
+    service.startActivity(intent)
     settle(2000)
     return ok()
+  }
+
+  /**
+   * After the Play Store: polls until the user has installed the app, then opens it.
+   * Runs on the phone with no AI calls.
+   */
+  private fun waitForApp(pkg: String, timeoutS: Long): JSONObject {
+    val deadline = System.currentTimeMillis() + timeoutS * 1000
+    while (System.currentTimeMillis() < deadline) {
+      if (isInstalled(pkg)) {
+        Thread.sleep(1500) // let the installer finish writing
+        val launch = service.packageManager.getLaunchIntentForPackage(pkg)
+          ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return ok().put("installed", true)
+        service.startActivity(launch)
+        settle(2500)
+        return ok().put("installed", true).put("opened", true)
+      }
+      Thread.sleep(2000)
+    }
+    return err("not_installed_in_time")
   }
 
   private fun launcherApps(): List<Pair<String, String>> {
@@ -181,6 +205,7 @@ class ActionExecutor(private val service: AccessibilityService) {
   private fun ok() = JSONObject().put("ok", true)
 
   companion object {
+    val LINK_APPS = mapOf("blinkit.com" to "com.grofers.customerapp", "youtube.com" to "com.google.android.youtube")
     val LINK_ALLOWLIST = listOf(
       "https://www.youtube.com/results?search_query=",
       "https://m.youtube.com/results?search_query=",

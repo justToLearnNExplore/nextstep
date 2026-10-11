@@ -151,6 +151,13 @@ class AgentRunner(
     val prompt = a.optString("ask").ifBlank { a.optString("intent") }
     log("action", JSONObject(a.toString()).put("final_gate", verdict.gate.name).put("local_reason", verdict.reason))
 
+    if (verdict.gate == Gate.AUTO && name == "wait_for_app") {
+      // The user is on the Play Store page: keep the bubble out of the way, but tell them.
+      val msg = prompt.ifBlank { t("waitingInstall", "Please tap Install. I'll continue as soon as it's installed.") }
+      overlay.showPanel(msg, emptyList(), autoHideMs = 8_000L)
+      voice.speak(msg, lang)
+      return executor.execute(name, args, w, h)
+    }
     return when (verdict.gate) {
       Gate.AUTO -> overlay.whileHidden { executor.execute(name, args, w, h) }
       Gate.CONFIRM -> {

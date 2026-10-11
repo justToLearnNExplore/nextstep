@@ -25,6 +25,7 @@ _EN = {
     "blocked_link": "I won't open this link. It may not be safe.",
     "no_consent": "I need your approval before I start.",
     "scam_warning": "This message looks like a scam. Do not open the link and do not share any details or OTP.",
+    "waiting_install": "Please tap Install. I'll continue as soon as it's installed.",
 }
 
 LANGUAGES: dict[str, Language] = {
@@ -41,6 +42,7 @@ LANGUAGES: dict[str, Language] = {
             "blocked_link": "मैं यह लिंक नहीं खोलूँगा। यह सुरक्षित नहीं हो सकता।",
             "no_consent": "शुरू करने से पहले मुझे आपकी अनुमति चाहिए।",
             "scam_warning": "यह मैसेज धोखा लगता है। लिंक मत खोलिए और कोई जानकारी या ओटीपी मत बताइए।",
+            "waiting_install": "कृपया Install दबाइए। इंस्टॉल होते ही मैं आगे बढ़ूँगा।",
         },
     ),
     "kn-IN": Language(
@@ -55,6 +57,7 @@ LANGUAGES: dict[str, Language] = {
             "blocked_link": "ಈ ಲಿಂಕ್ ತೆರೆಯುವುದಿಲ್ಲ. ಇದು ಸುರಕ್ಷಿತವಲ್ಲದಿರಬಹುದು.",
             "no_consent": "ಶುರು ಮಾಡುವ ಮೊದಲು ನಿಮ್ಮ ಒಪ್ಪಿಗೆ ಬೇಕು.",
             "scam_warning": "ಈ ಸಂದೇಶ ಮೋಸದಂತೆ ಕಾಣುತ್ತದೆ. ಲಿಂಕ್ ತೆರೆಯಬೇಡಿ, ಯಾವುದೇ ವಿವರ ಅಥವಾ ಒಟಿಪಿ ಹಂಚಿಕೊಳ್ಳಬೇಡಿ.",
+            "waiting_install": "ದಯವಿಟ್ಟು Install ಒತ್ತಿ. ಇನ್‌ಸ್ಟಾಲ್ ಆದ ತಕ್ಷಣ ನಾನು ಮುಂದುವರಿಸುತ್ತೇನೆ.",
         },
     ),
 }

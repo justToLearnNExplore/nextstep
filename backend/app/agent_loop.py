@@ -14,6 +14,7 @@ from typing import Any
 
 from . import family
 from .guardian import ALLOWED_LINK_PREFIXES, classify
+from .i18n import phrase
 from .operator import next_actions
 from .protocol import GatedAction, Screen, StepResponse
 from .rules import interruption_action
@@ -37,6 +38,10 @@ def absorb_results(task: TaskRecord, results: list[dict[str, Any]]) -> None:
         intent = sent.get("intent") or r.get("name", "")
         if _ok(res):
             task.history.append(intent[:120])
+            if sent.get("name") == "open_play_store":
+                task.awaiting_install = sent.get("package") or task.plan.target_package
+            if sent.get("name") == "wait_for_app":
+                task.history[-1] = "The app is installed and open now"
             if sent.get("learn") and sent.get("step"):
                 task.trace.append(SkillStep.model_validate(sent["step"]))
         elif res.get("error") != "user_declined":
@@ -54,13 +59,22 @@ def _remember(task: TaskRecord, screen: Screen, actions: list[GatedAction], lear
     for a in actions:
         step = step_from_action(a.name, {**a.args, "intent": a.intent}, a.intent, screen, task.plan.param_map) if learnable else None
         task.pending[a.call_id] = {
-            "name": a.name, "intent": a.intent, "gate": a.gate.value,
+            "name": a.name, "intent": a.intent, "gate": a.gate.value, "package": a.args.get("package"),
             "learn": step is not None, "step": step.model_dump() if step else None,
         }
 
 
 async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse:
     n = task.turns + task.skill_steps + task.rule_steps
+
+    # 0. Just sent the user to the Play Store: the phone watches for the install itself (no AI).
+    if task.awaiting_install:
+        pkg, task.awaiting_install = task.awaiting_install, None
+        task.rule_steps += 1
+        act = _gate(task, screen, "wait_for_app", {"package": pkg, "timeout_s": 180,
+                    "intent": phrase(task.language, "waiting_install")}, f"install-{n}")
+        _remember(task, screen, [act], learnable=False)
+        return StepResponse(actions=[act], status_text=act.intent, source="rule")
 
     # 1. Free rules for interruptions.
     if (args := interruption_action(screen)) is not None:
