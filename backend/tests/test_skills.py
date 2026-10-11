@@ -53,7 +53,7 @@ class FakeGemini:
             return StepResponse(done=True, message="Order placed", source="ai")
         labels = {n.label(): n for n in screen.nodes}
         if any(n.edit and n.focus for n in screen.nodes):
-            act = GatedAction(call_id=f"ai{self.calls}", name="type", args={"text": task.plan.params["item"], "press_enter": True},
+            act = GatedAction(call_id=f"ai{self.calls}", name="type", args={"text": task.plan.param_map["item"], "press_enter": True},
                               intent="Type item", gate=Gate.AUTO)
         elif "Search for atta, dal and more" in labels:
             x, y = screen.norm_box(labels["Search for atta, dal and more"])
@@ -62,7 +62,7 @@ class FakeGemini:
             x, y = screen.norm_box(labels["Place Order ₹68"])
             act = GatedAction(call_id=f"ai{self.calls}", name="click", args={"x": x, "y": y}, intent="Place order ₹68", gate=Gate.CONFIRM)
         else:  # results: the ADD next to the wanted item
-            want = next(n for n in screen.nodes if task.plan.params["item"].lower() in n.label().lower())
+            want = next(n for n in screen.nodes if task.plan.param_map["item"].lower() in n.label().lower())
             add = min((n for n in screen.nodes if n.label() == "ADD"), key=lambda n: abs(n.b[1] - want.b[1]))
             x, y = screen.norm_box(add)
             act = GatedAction(call_id=f"ai{self.calls}", name="click", args={"x": x, "y": y}, intent="Add to cart", gate=Gate.AUTO)

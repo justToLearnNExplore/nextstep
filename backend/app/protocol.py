@@ -7,7 +7,7 @@ Gemini Computer Use actions, each annotated with a safety gate the phone must ho
 from enum import Enum
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class Gate(str, Enum):
@@ -105,6 +105,12 @@ class StartTaskRequest(BaseModel):
     screen: Screen
 
 
+class Param(BaseModel):
+    # A list of pairs, not a dict: Gemini's response schema doesn't support free-form maps.
+    name: str
+    value: str
+
+
 class TaskPlan(BaseModel):
     """Planner output, written in the user's language, read aloud before consent."""
 
@@ -118,8 +124,9 @@ class TaskPlan(BaseModel):
         default=None,
         description="Stable snake_case id for this KIND of task, independent of item/person, e.g. 'blinkit_order_item', 'youtube_play_search', 'whatsapp_call_contact'.",
     )
-    params: dict[str, str] = Field(
-        default_factory=dict, description="The variable parts, e.g. {'item': 'milk 1 litre'} or {'query': 'devotional songs'}."
+    params: list["Param"] = Field(
+        default_factory=list,
+        description="The variable parts, e.g. [{name: 'item', value: 'milk 1 litre'}] or [{name: 'query', value: 'devotional songs'}].",
     )
     deep_link: str | None = Field(
         default=None,
@@ -132,6 +139,15 @@ class TaskPlan(BaseModel):
         default=None, description="For medicine_photo: who to send it to, if the user said so."
     )
     operator_goal: str = Field(description="Precise English instruction for the phone operator agent.")
+
+    @field_validator("params", mode="before")
+    @classmethod
+    def _params_from_dict(cls, v):
+        return [{"name": k, "value": str(x)} for k, x in v.items()] if isinstance(v, dict) else v
+
+    @property
+    def param_map(self) -> dict[str, str]:
+        return {p.name: p.value for p in self.params}
 
 
 class MedicineRequest(BaseModel):

@@ -52,7 +52,7 @@ def _gate(task: TaskRecord, screen: Screen, name: str, args: dict[str, Any], cal
 
 def _remember(task: TaskRecord, screen: Screen, actions: list[GatedAction], learnable: bool) -> None:
     for a in actions:
-        step = step_from_action(a.name, {**a.args, "intent": a.intent}, a.intent, screen, task.plan.params) if learnable else None
+        step = step_from_action(a.name, {**a.args, "intent": a.intent}, a.intent, screen, task.plan.param_map) if learnable else None
         task.pending[a.call_id] = {
             "name": a.name, "intent": a.intent, "gate": a.gate.value,
             "learn": step is not None, "step": step.model_dump() if step else None,
@@ -88,7 +88,7 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
             if idx >= len(skill.steps):
                 break
             step = skill.steps[idx]
-            args = replay_action(step, screen, task.plan.params)
+            args = replay_action(step, screen, task.plan.param_map)
             if args is not None:
                 task.replay_index = idx + 1
                 task.skill_steps += 1
@@ -96,7 +96,7 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
                 _remember(task, screen, [act], learnable=True)
                 return StepResponse(actions=[act], status_text=act.intent, source="skill")
         nxt = skill.steps[task.replay_index]
-        hint = nxt.intent or (f"tap '{fill(nxt.label, task.plan.params)}'" if nxt.label else nxt.name)
+        hint = nxt.intent or (f"tap '{fill(nxt.label, task.plan.param_map)}'" if nxt.label else nxt.name)
 
     # 4. Gemini (only when nothing cheaper applies).
     res = await next_actions(task, screen, hint)
@@ -104,7 +104,7 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     # If the AI just did what the recipe expected, advance the recipe too.
     if skill is not None and res.actions and task.replay_index < len(skill.steps):
         nxt = skill.steps[task.replay_index]
-        node = find_by_label(screen, fill(nxt.label, task.plan.params)) if nxt.label else None
+        node = find_by_label(screen, fill(nxt.label, task.plan.param_map)) if nxt.label else None
         a0 = res.actions[0]
         if node is not None and a0.name == nxt.name and "x" in a0.args:
             if screen.nodes_at(int(a0.args["x"]), int(a0.args["y"])) and node in screen.nodes_at(int(a0.args["x"]), int(a0.args["y"])):
@@ -131,7 +131,7 @@ def finish(store: Store, task: TaskRecord, success: bool) -> None:
         doc_id = task.skill_id or f"{task.user_id}__{key}"
         existing = store.get_skill(doc_id)
         if success:
-            skill = learn(task.user_id, key, task.plan.params, task.trace, existing if (existing and existing.uid == task.user_id) else None)
+            skill = learn(task.user_id, key, task.plan.param_map, task.trace, existing if (existing and existing.uid == task.user_id) else None)
             if skill:
                 store.put_skill(skill)
         elif existing:
