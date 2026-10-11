@@ -39,6 +39,8 @@ class TaskRecord(BaseModel):
     skill_id: str | None = None  # skill being replayed
     replay_index: int = 0
     last_failed: bool = False
+    last_signature: str = ""  # previous action, to catch the agent repeating itself
+    repeats: int = 0
     # Cost/efficiency telemetry (shown to judges and in the action log).
     ai_calls: int = 0
     skill_steps: int = 0

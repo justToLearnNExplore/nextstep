@@ -17,7 +17,7 @@ from .guardian import ALLOWED_LINK_PREFIXES, classify
 from .operator import next_actions
 from .protocol import GatedAction, Screen, StepResponse
 from .rules import interruption_action
-from .skills import Skill, SkillStep, find_by_label, fill, learn, replay_action, step_from_action
+from .skills import MIN_MATCH, Skill, SkillStep, fill, learn, replay_action, similarity, step_from_action, target_node
 from .store import Store, TaskRecord
 
 log = logging.getLogger("nextstep")
@@ -71,10 +71,11 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
 
     # 2. Deep link on the very first step (no recipe yet).
     link = task.plan.deep_link or ""
-    if not task.history and not task.skill_id and link.startswith(ALLOWED_LINK_PREFIXES):
+    if not task.history and link.startswith(ALLOWED_LINK_PREFIXES):
+        # Rebuilt from each plan (it carries this task's search term), so never part of a recipe.
         task.rule_steps += 1
         act = _gate(task, screen, "open_link", {"url": link, "intent": task.plan.summary[:80]}, f"link-{n}")
-        _remember(task, screen, [act], learnable=True)
+        _remember(task, screen, [act], learnable=False)
         return StepResponse(actions=[act], status_text=act.intent, source="rule")
 
     # 3. Learned skill.
@@ -100,15 +101,37 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
 
     # 4. Gemini (only when nothing cheaper applies).
     res = await next_actions(task, screen, hint)
+    res = guard_repeats(task, res)
     _remember(task, screen, res.actions, learnable=True)
-    # If the AI just did what the recipe expected, advance the recipe too.
+    # If the AI just did what the recipe expected (same kind of action on a similar element),
+    # advance the recipe so replay continues from the next step.
     if skill is not None and res.actions and task.replay_index < len(skill.steps):
-        nxt = skill.steps[task.replay_index]
-        node = find_by_label(screen, fill(nxt.label, task.plan.param_map)) if nxt.label else None
-        a0 = res.actions[0]
-        if node is not None and a0.name == nxt.name and "x" in a0.args:
-            if screen.nodes_at(int(a0.args["x"]), int(a0.args["y"])) and node in screen.nodes_at(int(a0.args["x"]), int(a0.args["y"])):
+        nxt, a0 = skill.steps[task.replay_index], res.actions[0]
+        if a0.name == nxt.name:
+            tapped = target_node(screen, int(a0.args.get("x", -1)), int(a0.args.get("y", -1))) if "x" in a0.args else None
+            if nxt.name == "type" or (tapped is not None and similarity(fill(nxt.label, task.plan.param_map), tapped.label()) >= MIN_MATCH):
                 task.replay_index += 1
+    return res
+
+
+MAX_REPEATS = 2
+
+
+def guard_repeats(task: TaskRecord, res: StepResponse) -> StepResponse:
+    """Stops the agent from looping on the same action (e.g. reopening the same search)."""
+    if res.done or not res.actions:
+        task.last_signature, task.repeats = "", 0
+        return res
+    a = res.actions[0]
+    sig = f"{a.name}:{sorted((k, str(v)) for k, v in a.args.items() if k in ('x', 'y', 'url', 'text', 'app_name'))}"
+    task.repeats = task.repeats + 1 if sig == task.last_signature else 0
+    task.last_signature = sig
+    if task.repeats >= MAX_REPEATS:
+        log.warning("task %s stopped: action repeated %d times (%s)", task.id, task.repeats + 1, a.name)
+        task.status = "failed"
+        return StepResponse(done=True, message="", source="ai")
+    if task.repeats == 1:
+        task.last_failed = True  # next turn: higher thinking + full screenshot + "try another way"
     return res
 
 

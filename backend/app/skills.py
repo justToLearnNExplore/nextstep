@@ -17,7 +17,8 @@ from pydantic import BaseModel, Field
 
 from .protocol import Screen, UiNode
 
-REPLAYABLE = {"click", "long_press", "type", "go_back", "press_key", "open_app", "open_link", "wait"}
+# open_link is excluded: deep links are rebuilt from each plan's own search term.
+REPLAYABLE = {"click", "long_press", "type", "go_back", "press_key", "open_app", "wait"}
 MIN_MATCH = 0.6
 
 
@@ -52,7 +53,7 @@ def step_from_action(name: str, args: dict[str, Any], intent: str, screen: Scree
     """Turns an executed action into a coordinate-free recipe step."""
     if name not in REPLAYABLE:
         return None
-    step = SkillStep(name=name, package=screen.package, intent=intent)
+    step = SkillStep(name=name, package=screen.package, intent=templatize(intent, params))
     if name in ("click", "long_press"):
         node = target_node(screen, int(args.get("x", -1)), int(args.get("y", -1)))
         if node is None or not node.label():
@@ -101,11 +102,23 @@ def context_of(screen: Screen, node: UiNode) -> str:
 
 
 def templatize(text: str, params: dict[str, str]) -> str:
-    """'Amul milk 1 litre' with params {item: 'milk'} -> 'Amul {item} 1 litre' (case-insensitive)."""
+    """'Amul Taaza milk 1 L' with {item: 'milk 1 litre'} -> 'Amul Taaza {item} 1 L'.
+    Tries the whole value first, then its distinctive words (titles rarely match word for word)."""
     for k, v in sorted(params.items(), key=lambda kv: -len(kv[1])):
-        if v and len(v) >= 2:
-            text = re.sub(re.escape(v), "{" + k + "}", text, flags=re.I)
+        if not v or len(v) < 2:
+            continue
+        new = re.sub(re.escape(v), "{" + k + "}", text, flags=re.I)
+        if new == text:
+            for word in sorted(_tokens(v), key=len, reverse=True):
+                if len(word) >= 3 and not word.isdigit() and word not in _UNITS:
+                    new = re.sub(rf"(?<!\w){re.escape(word)}(?!\w)", "{" + k + "}", text, count=1, flags=re.I)
+                    if new != text:
+                        break
+        text = new
     return text
+
+
+_UNITS = {"litre", "liter", "litres", "kg", "gram", "grams", "ml", "pack", "packet", "one", "two", "half"}
 
 
 def fill(text: str, params: dict[str, str]) -> str:
@@ -152,14 +165,19 @@ def find_by_label(screen: Screen, label: str, context: str = "") -> UiNode | Non
             candidates.append((score, n))
     if not candidates:
         return None
-    if context and len(candidates) > 1:
-        anchors = [n for n in screen.nodes if n.label() and similarity(context, n.label()) >= 0.5]
+    if context:
+        # Always check what the button belongs to, even if it's the only match on screen:
+        # a lone "ADD" may be next to a different product.
+        anchors = [n for n in screen.nodes if n.label() and n not in [c for _, c in candidates]
+                   and similarity(context, n.label()) >= 0.5]
         if not anchors:
             return None  # the item isn't on this screen; let the AI look (e.g. scroll/search)
         def dist(n: UiNode) -> float:
+            # Same row/card matters most; a title far left of its button is still "its" title.
             cx, cy = _centre(n)
-            return min(((cx - _centre(a)[0]) ** 2 + (cy - _centre(a)[1]) ** 2) ** 0.5 for a in anchors)
-        return min(candidates, key=lambda sn: dist(sn[1]))[1]
+            return min(abs(cy - _centre(a)[1]) + 0.3 * abs(cx - _centre(a)[0]) for a in anchors)
+        best = min(candidates, key=lambda sn: dist(sn[1]))[1]
+        return best if dist(best) <= screen.height * 0.12 else None
     return max(candidates, key=lambda sn: sn[0])[1]
 
 
@@ -173,9 +191,9 @@ def replay_action(step: SkillStep, screen: Screen, params: dict[str, str]) -> di
         if node is None:
             return None
         x, y = screen.norm_box(node)
-        return {"x": x, "y": y, "intent": step.intent or f"Tap '{node.label()[:40]}'"}
+        return {"x": x, "y": y, "intent": fill(step.intent, params) or f"Tap '{node.label()[:40]}'"}
     if step.name == "type":
         if not any(n.focus and n.edit for n in screen.nodes):
             return None
-        return {"text": fill(step.text, params), "press_enter": step.args.get("press_enter", False), "intent": step.intent}
-    return {**step.args, "intent": step.intent}
+        return {"text": fill(step.text, params), "press_enter": step.args.get("press_enter", False), "intent": fill(step.intent, params)}
+    return {**step.args, "intent": fill(step.intent, params)}

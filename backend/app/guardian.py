@@ -36,6 +36,8 @@ SECRET = re.compile(
     r"expiry|aadhaar|पासवर्ड|पिन|ओटीपी|ಪಾಸ್‌ವರ್ಡ್|ಪಿನ್|ಒಟಿಪಿ)",
     re.I,
 )
+# Choosing an option (payment method, delivery slot) is reversible; placing the order is not.
+SELECT_ONLY = re.compile(r"^(?!.*(place|confirm|order now|buy|send|transfer)).*(on delivery|cash|cod\b|upi|wallet|card)", re.I)
 URL = re.compile(r"(https?://\S+|\b[\w-]+\.(?:com|in|net|org|co|xyz|top|info|link|ly|me)\S*)", re.I)
 # Deep links NextStep may open directly (search pages only).
 ALLOWED_LINK_PREFIXES = (
@@ -94,7 +96,7 @@ def classify(
             escalate(Gate.PRIVATE, "secret_field", phrase(language, "private"))
         elif screen.package in MESSAGE_APPS and _has_unofficial_link(label):
             escalate(Gate.BLOCKED, "unverified_link_in_message", phrase(language, "blocked_link"))
-        elif IRREVERSIBLE.search(label) or IRREVERSIBLE.search(intent):
+        elif (IRREVERSIBLE.search(label) or IRREVERSIBLE.search(intent)) and not SELECT_ONLY.search(label):
             escalate(Gate.CONFIRM, f"irreversible:{label[:60] or intent[:60]}")
 
     if name == "type":

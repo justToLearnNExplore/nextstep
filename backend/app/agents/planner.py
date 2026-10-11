@@ -33,7 +33,8 @@ Rules:
 - Reuse: set `skill_key` to a stable snake_case name for the KIND of task, the same every time
   regardless of item or person (blinkit_order_item, youtube_play_search, whatsapp_call_contact,
   whatsapp_message_contact, phone_call_contact). Put the variable parts in `params` with short
-  keys (item, query, contact). This lets NextStep replay a learned routine instead of re-thinking.
+  keys: item = just the product noun as shops title it ("milk", "curd", "bread"), quantity
+  separately ("1 litre"); query; contact. This lets NextStep replay a learned routine instead of re-thinking.
 - Shortcut: if the task is a YouTube or Blinkit search, set `deep_link` to
   https://www.youtube.com/results?search_query=<url-encoded query> or
   https://blinkit.com/s/?q=<url-encoded item>. Otherwise leave it empty.

@@ -142,3 +142,38 @@ def test_interruptions_are_dismissed_for_free():
     act = interruption_action(s)
     assert act and "Not now" in act["intent"]
     assert interruption_action(Screen.model_validate(screens("milk", "x")[3])) is None
+
+
+def test_repeated_action_is_stopped():
+    from app.agent_loop import guard_repeats
+    from app.store import TaskRecord
+
+    t = TaskRecord(goal="g", language="en-IN", plan=TaskPlan(summary="s", steps=[], operator_goal="g"), consented=True, status="running")
+    same = lambda: StepResponse(actions=[GatedAction(call_id="c", name="open_link", args={"url": "https://www.youtube.com/results?search_query=x"}, gate=Gate.AUTO)])
+    assert not guard_repeats(t, same()).done
+    assert not guard_repeats(t, same()).done and t.last_failed  # second time: try another way
+    r = guard_repeats(t, same())
+    assert r.done and t.status == "failed"  # third time: stop politely
+
+
+def test_lone_button_next_to_wrong_product_is_not_tapped():
+    s = Screen.model_validate({"package": PKG, "width": 1080, "height": 2400, "nodes": [
+        {"i": 0, "text": "Amul Milk 500 g", "b": [40, 400, 640, 480]},
+        {"i": 1, "text": "ADD", "b": [760, 420, 1040, 500], "click": True},
+        {"i": 2, "text": "Amul Taaza curd 1 L", "b": [40, 700, 640, 780]},
+        {"i": 3, "text": "1", "b": [760, 720, 1040, 800]},
+    ]})
+    assert find_by_label(s, "ADD", "Amul Taaza curd 1 L") is None
+
+
+def test_templatize_uses_item_words_when_title_differs():
+    from app.skills import templatize
+    assert templatize("Amul Taaza milk 1 L", {"item": "milk 1 litre"}) == "Amul Taaza {item} 1 L"
+
+
+def test_choosing_cash_on_delivery_is_routine_but_placing_order_asks():
+    from app.guardian import classify
+    s = Screen.model_validate(screens("milk", "x")[3])
+    cod = classify("click", {"x": 500, "y": 770}, s, "en-IN", True)
+    place = classify("click", {"x": 500, "y": 937}, s, "en-IN", True)
+    assert cod.gate == Gate.AUTO and place.gate == Gate.CONFIRM
