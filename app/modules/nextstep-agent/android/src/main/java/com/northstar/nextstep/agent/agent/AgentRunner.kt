@@ -334,10 +334,10 @@ class AgentRunner(
     val decision = CompletableFuture<Boolean>()
     pendingDecision = decision
     // Buttons work immediately: a tap answers and cuts the speech short.
-    val answer = { yes: Boolean -> if (decision.complete(yes)) voice.stopSpeaking() }
+    val respond = { yes: Boolean -> if (decision.complete(yes)) voice.stopSpeaking() }
     overlay.showPanel(message, listOf(
-      PanelButton(yesLabel, if (compact) Style.PRIMARY else Style.GO) { answer(true) },
-      PanelButton(noLabel, if (compact) Style.STOP else Style.OUTLINE) { answer(false) },
+      PanelButton(yesLabel, if (compact) Style.PRIMARY else Style.GO) { respond(true) },
+      PanelButton(noLabel, if (compact) Style.STOP else Style.OUTLINE) { respond(false) },
     ), steps = steps)
     val spoken = CompletableFuture<Unit>()
     voice.speak((listOf(message) + steps).joinToString(". "), lang) { spoken.complete(Unit) }
