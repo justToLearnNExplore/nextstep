@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import * as Speech from 'expo-speech';
 import { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { MicButton } from '../components/MicButton';
 import { BigButton, Body, Screen, Title } from '../components/ui';
@@ -35,7 +35,10 @@ export default function Grocery() {
         <Title>{t('whatToOrder')}</Title>
         <MicButton onHeard={order} size={150} />
         {last ? (
-          <BigButton label={`${t('repeatLastOrder')}: ${last}`} icon="repeat" tone="outline" onPress={() => order(last)} />
+          <View style={styles.repeat}>
+            <Body>{t('lastOrder').replace('{items}', last)}</Body>
+            <BigButton label={t('repeatLastOrder')} icon="repeat" tone="outline" onPress={() => order(last)} />
+          </View>
         ) : null}
         <BigButton label={t('photoOfList')} icon="camera" tone="outline" onPress={() => router.push('/grocery-photo')} />
         {status ? <Body>{status}</Body> : null}
@@ -47,4 +50,5 @@ export default function Grocery() {
 
 const styles = StyleSheet.create({
   body: { paddingVertical: 24, gap: 18 },
+  repeat: { gap: 8 },
 });

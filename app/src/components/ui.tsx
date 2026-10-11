@@ -78,7 +78,14 @@ export function BigButton({
           <MaterialCommunityIcons name={icon} size={tall ? 34 : 28} color={t.fg} />
         </View>
       ) : null}
-      <Text style={[styles.buttonText, { color: t.fg }, align === 'start' && styles.buttonTextStart]}>{label}</Text>
+      <Text
+        style={[styles.buttonText, { color: t.fg }, align === 'start' && styles.buttonTextStart]}
+        numberOfLines={align === 'start' ? undefined : 1}
+        adjustsFontSizeToFit={align !== 'start'}
+        minimumFontScale={0.75}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }

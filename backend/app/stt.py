@@ -12,8 +12,11 @@ from .i18n import language
 
 _client: speech.SpeechAsyncClient | None = None
 
+# Only the user's chosen language: with alternates (en-IN + hi-IN), Google returned English
+# speech in Hindi script, and that Hindi then flowed into plans and messages.
+ALTERNATES: dict[str, list[str]] = {}
+
 # App and task words seniors say often; boosts recognition of brand names.
-ALTERNATES = {"en-IN": ["hi-IN"], "hi-IN": ["en-IN"], "kn-IN": ["en-IN"]}
 
 _HINTS = ["Uber", "Phoenix", "Blinkit", "WhatsApp", "YouTube", "NextStep", "milk", "medicine", "bhajan", "doctor", "order"]
 

@@ -20,7 +20,6 @@
   "speak": "बोलिए",
   "listening": "मैं सुन रहा हूँ…",
   "didNotHear": "मुझे सुनाई नहीं दिया। बोलिए दबाकर फिर से कहें।",
-  "youSaid": "आपने कहा",
   "serviceOff": "पहले NextStep helper चालू करें।",
   "settings": "सेटिंग्स",
   "language": "भाषा",
@@ -121,7 +120,7 @@
   "homeRide": "गाड़ी बुक करें",
   "homePhone": "फ़ोन मदद",
   "repeatLastOrder": "पिछला ऑर्डर दोबारा",
-  "photoOfList": "मेरी लिस्ट की फोटो",
+  "photoOfList": "लिस्ट की फोटो लें",
   "pointAtList": "कैमरा अपनी सामान की लिस्ट पर रखिए।",
   "readingList": "आपकी लिस्ट पढ़ रहा हूँ…",
   "orderThese": "ये मंगाएँ",
@@ -130,7 +129,7 @@
   "whereTo": "आप कहाँ जाना चाहेंगे?",
   "takeMeHome": "मुझे घर ले चलो",
   "goalRide": "{place} के लिए Uber बुक करो",
-  "cancelRideHint": "बाद में राइड कैंसल करने के लिए NextStep बटन दबाकर 'मुझे बताइए' चुनें।",
+  "cancelRideHint": "बाद में राइड कैंसल करने के लिए NextStep बटन, फिर माइक दबाएँ और कहें “मेरी राइड कैंसल करो”।",
   "phoneHelpTitle": "फ़ोन में क्या मदद करूँ?",
   "noSound": "फ़ोन में आवाज़ नहीं आ रही",
   "phoneSilent": "फ़ोन साइलेंट हो गया",
@@ -196,5 +195,6 @@
   "gotItWait": "समझ गया, एक पल…",
   "keepGoing": "जारी रखें",
   "stop": "रोकें",
-  "cancel": "रद्द करें"
+  "cancel": "रद्द करें",
+  "lastOrder": "पिछली बार: {items}"
 }

@@ -63,7 +63,6 @@ export function MicButton({
       setStatus(heard.error === 'cancelled' ? null : t(heardErrorKey(heard.error)));
       return;
     }
-    setStatus(`${t('youSaid')}: “${heard.text}”`);
     onHeard(heard.text);
   };
 

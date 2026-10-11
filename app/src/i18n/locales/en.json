@@ -20,7 +20,6 @@
   "speak": "Speak",
   "listening": "I'm listening…",
   "didNotHear": "I didn't hear that. Tap Speak and try again.",
-  "youSaid": "You said",
   "serviceOff": "Turn on NextStep helper first.",
   "settings": "Settings",
   "language": "Language",
@@ -121,7 +120,7 @@
   "homeRide": "Book a ride",
   "homePhone": "Phone help",
   "repeatLastOrder": "Repeat last order",
-  "photoOfList": "Photo of my list",
+  "photoOfList": "Take photo of list",
   "pointAtList": "Point the camera at your grocery list.",
   "readingList": "Reading your list…",
   "orderThese": "Order these",
@@ -130,7 +129,7 @@
   "whereTo": "Where would you like to go?",
   "takeMeHome": "Take me home",
   "goalRide": "Book an Uber ride to {place}",
-  "cancelRideHint": "To cancel a ride later, tap the NextStep button and choose Tell me.",
+  "cancelRideHint": "To cancel a ride later, tap the NextStep button, then the mic, and say “cancel my ride”.",
   "phoneHelpTitle": "How can I help with your phone?",
   "noSound": "No sound on my phone",
   "phoneSilent": "Phone went silent",
@@ -188,5 +187,6 @@
   "gotItWait": "Got it, one moment…",
   "keepGoing": "Keep going",
   "stop": "Stop",
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "lastOrder": "Last time: {items}"
 }

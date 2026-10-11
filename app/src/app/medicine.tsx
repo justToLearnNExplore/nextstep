@@ -147,22 +147,16 @@ export default function Medicine() {
             tall
             onPress={takePhoto}
           />
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <BigButton
-                label={torch ? t('torchOff') : t('torchOn')}
-                icon={torch ? 'flashlight-off' : 'flashlight'}
-                tone="outline"
-                onPress={() => {
-                  camera.current?.setTorch(!torch);
-                  setTorch(!torch);
-                }}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <BigButton label={t('back')} icon="arrow-left" tone="outline" onPress={() => router.back()} />
-            </View>
-          </View>
+          <BigButton
+            label={torch ? t('torchOff') : t('torchOn')}
+            icon={torch ? 'flashlight-off' : 'flashlight'}
+            tone="outline"
+            onPress={() => {
+              camera.current?.setTorch(!torch);
+              setTorch(!torch);
+            }}
+          />
+          <BigButton label={t('back')} icon="arrow-left" tone="outline" onPress={() => router.back()} />
         </View>
       </View>
     );
@@ -224,7 +218,6 @@ const styles = StyleSheet.create({
   banner: { margin: size.gutter, marginTop: 48, borderRadius: size.radius, padding: 18 },
   bannerText: { fontFamily: fonts.bold, fontSize: 24, lineHeight: 32, textAlign: 'center' },
   controls: { marginTop: 'auto', padding: size.gutter, gap: 12, backgroundColor: colors.paper, borderTopLeftRadius: 24, borderTopRightRadius: 24 },
-  row: { flexDirection: 'row', gap: 12 },
   review: { paddingVertical: 24, gap: 16 },
   photo: { width: '100%', height: 280, borderRadius: size.radius, backgroundColor: colors.mist },
   note: { backgroundColor: colors.mist, borderRadius: size.radius, padding: 16 },

@@ -49,8 +49,9 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
     if (inOurApp) {
       // Opening NextStep always brings the bubble back if the user had hidden it.
       if (!prefs.overlayEnabled) { prefs.overlayEnabled = true; overlay.show() }
-      // Inside NextStep itself the bubble isn't needed (and would cover the Settings button).
+      // Inside NextStep itself the bubble and its menu aren't needed (they'd cover the screen).
       overlay.setBubbleHidden(true)
+      overlay.closePopup()
     } else if (event.packageName != packageName) {
       overlay.setBubbleHidden(false)
       if (!runner.isRunning) overlay.closePopup()

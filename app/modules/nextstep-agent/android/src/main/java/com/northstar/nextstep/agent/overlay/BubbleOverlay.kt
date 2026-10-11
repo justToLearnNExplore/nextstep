@@ -228,11 +228,11 @@ class BubbleOverlay(
         orientation = LinearLayout.HORIZONTAL
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
           .apply { topMargin = dp(8) }
-        addView(square(R.drawable.ic_ns_mic, null, t("tellMe", "Speak"), Style.PRIMARY) { closePopupNow(); host.onTellMe() })
-        addView(square(R.drawable.ic_nextstep_logo, "NextStep", t("openNextStep", "Open NextStep"), Style.OUTLINE, tint = false) {
+        addView(square(R.drawable.ic_ns_mic, t("tellMe", "Speak"), Style.PRIMARY) { closePopupNow(); host.onTellMe() })
+        addView(square(R.drawable.ic_nextstep_logo, t("openNextStep", "Open NextStep"), Style.OUTLINE, tint = false) {
           closePopupNow(); host.onOpenNextStep()
         })
-        addView(square(R.drawable.ic_ns_close, null, t("hideBubble", "Hide"), Style.OUTLINE) { closePopupNow(); host.onHide() })
+        addView(square(R.drawable.ic_ns_close, t("hideBubble", "Hide"), Style.OUTLINE) { closePopupNow(); host.onHide() })
       })
     }
     showPopup(card)
@@ -433,9 +433,9 @@ class BubbleOverlay(
     }
   }
 
-  /** Small square menu button: an icon, with an optional short caption under it. */
+  /** Small square menu button: one icon, read out by TalkBack as [a11y]. */
   private fun square(
-    icon: Int, caption: String?, a11y: String, style: Style, tint: Boolean = true, onClick: () -> Unit,
+    icon: Int, a11y: String, style: Style, tint: Boolean = true, onClick: () -> Unit,
   ) = LinearLayout(service).apply {
     val (bg, fg) = colors(style)
     orientation = LinearLayout.VERTICAL
@@ -447,16 +447,7 @@ class BubbleOverlay(
       setImageResource(icon)
       if (tint) setColorFilter(fg)
       importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-    }, LinearLayout.LayoutParams(dp(if (caption == null) 34 else 30), dp(if (caption == null) 34 else 30)))
-    caption?.let {
-      addView(TextView(service).apply {
-        text = it
-        setTextColor(fg)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-        typeface = Typeface.DEFAULT_BOLD
-        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
-      })
-    }
+    }, LinearLayout.LayoutParams(dp(36), dp(36)))
     layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
       marginStart = dp(4); marginEnd = dp(4)
     }
