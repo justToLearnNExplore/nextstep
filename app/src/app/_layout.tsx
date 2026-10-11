@@ -10,7 +10,7 @@ import { useEffect } from 'react';
 import { LanguageProvider, overlayLabels, useI18n } from '../i18n';
 import { configureAgent, useAgentEventCollector } from '../lib/agent';
 import { put } from '../lib/api';
-import { getIdentity, syncIdentityToNative } from '../lib/identity';
+import { ensureAccount, syncIdentityToNative } from '../lib/identity';
 import { colors } from '../theme';
 
 /** Keeps the native agent (overlay, voice, backend calls) in the user's language. */
@@ -24,9 +24,11 @@ function NativeSync() {
   // (covers onboarding while offline, and language changes).
   useEffect(() => {
     if (!ready) return;
-    syncIdentityToNative()
-      .then(getIdentity)
-      .then((id) => id && put('/v1/me', { display_name: id.name, language: lang.tag }))
+    ensureAccount()
+      .then(async (id) => {
+        await syncIdentityToNative();
+        if (id.name) await put('/v1/me', { display_name: id.name, language: lang.tag });
+      })
       .catch(() => {});
   }, [lang, ready]);
   return null;

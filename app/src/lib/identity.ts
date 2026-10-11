@@ -54,6 +54,14 @@ async function firebase<T>(url: string, body: Record<string, unknown>): Promise<
   return (await res.json()) as T;
 }
 
+/**
+ * Makes sure this phone has an account before anything calls the backend (the very first call is
+ * speech-to-text for the senior's name). The name is attached later by createAccount(name).
+ */
+export async function ensureAccount(): Promise<Identity> {
+  return (await load()) ?? createAccount('');
+}
+
 /** Creates the account on first run, or renames it. Safe to call again. */
 export async function createAccount(name: string): Promise<Identity> {
   const existing = await load();
@@ -62,14 +70,17 @@ export async function createAccount(name: string): Promise<Identity> {
 
   if (FIREBASE_API_KEY) {
     if (!id.refreshToken) {
+      // Anonymous Firebase account: no password, no OTP, bound to this phone.
       const r = await firebase<{ idToken: string; refreshToken: string; expiresIn: string; localId: string }>(
         'https://identitytoolkit.googleapis.com/v1/accounts:signUp',
         { returnSecureToken: true },
       );
       Object.assign(id, { uid: r.localId, idToken: r.idToken, refreshToken: r.refreshToken, expiresAt: Date.now() + Number(r.expiresIn) * 1000 });
     }
-    const token = await freshToken(id);
-    await firebase('https://identitytoolkit.googleapis.com/v1/accounts:update', { idToken: token, displayName: name });
+    if (name) {
+      const token = await freshToken(id);
+      await firebase('https://identitytoolkit.googleapis.com/v1/accounts:update', { idToken: token, displayName: name });
+    }
   }
   await persist(id);
   return id;

@@ -5,7 +5,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useI18n } from '../i18n';
 import { heardErrorKey, NextStepAgent } from '../lib/agent';
 import { put } from '../lib/api';
-import { createAccount, extractName } from '../lib/identity';
+import { createAccount, ensureAccount, extractName } from '../lib/identity';
 import { colors, fonts, size } from '../theme';
 import { BigButton, Body, Title } from './ui';
 
@@ -37,6 +37,7 @@ export function NameCapture({ initial, onDone }: { initial?: string; onDone: (na
     Speech.stop();
     setError(null);
     setPhase('listening');
+    await ensureAccount().catch(() => {});
     const heard = await NextStepAgent.listenOnce(lang.tag).catch(() => ({ text: null, error: 'network' as const }));
     const n = heard.text ? extractName(heard.text, lang.strings.namePrefixes, lang.strings.nameSuffixes) : '';
     if (!n) {
