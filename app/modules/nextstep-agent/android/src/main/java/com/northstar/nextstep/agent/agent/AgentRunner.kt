@@ -333,11 +333,15 @@ class AgentRunner(
   ): Boolean {
     val decision = CompletableFuture<Boolean>()
     pendingDecision = decision
+    // Buttons work immediately: a tap answers and cuts the speech short.
+    val answer = { yes: Boolean -> if (decision.complete(yes)) voice.stopSpeaking() }
     overlay.showPanel(message, listOf(
-      PanelButton(yesLabel, if (compact) Style.PRIMARY else Style.GO) { decision.complete(true) },
-      PanelButton(noLabel, if (compact) Style.STOP else Style.OUTLINE) { decision.complete(false) },
+      PanelButton(yesLabel, if (compact) Style.PRIMARY else Style.GO) { answer(true) },
+      PanelButton(noLabel, if (compact) Style.STOP else Style.OUTLINE) { answer(false) },
     ), steps = steps)
-    voice.speakAndWait((listOf(message) + steps).joinToString(". "), lang)
+    val spoken = CompletableFuture<Unit>()
+    voice.speak((listOf(message) + steps).joinToString(". "), lang) { spoken.complete(Unit) }
+    runCatching { CompletableFuture.anyOf(spoken, decision).get(60, java.util.concurrent.TimeUnit.SECONDS) }
     if (!compact && !decision.isDone) {
       voice.listen(lang) { heard -> heard.text?.let { yesNo(it) }?.let { decision.complete(it) } }
     }
@@ -366,9 +370,14 @@ class AgentRunner(
    */
   private fun say(message: String, finalMessage: Boolean = false) {
     if (message.isBlank()) return
-    overlay.showPanel(message, listOf(PanelButton(t("ok", "OK"), Style.PRIMARY) { overlay.hidePanel() }),
-      autoHideMs = if (finalMessage) null else 6_000L)
-    voice.speakAndWait(message, lang)
+    val dismissed = CompletableFuture<Unit>()
+    overlay.showPanel(message, listOf(PanelButton(t("ok", "OK"), Style.PRIMARY) {
+      voice.stopSpeaking(); overlay.hidePanel(); dismissed.complete(Unit)
+    }), autoHideMs = if (finalMessage) null else 6_000L)
+    val spoken = CompletableFuture<Unit>()
+    voice.speak(message, lang) { spoken.complete(Unit) }
+    // Continue as soon as it's spoken or the user taps OK.
+    runCatching { CompletableFuture.anyOf(spoken, dismissed).get(30, java.util.concurrent.TimeUnit.SECONDS) }
   }
 
   private fun log(kind: String, payload: JSONObject) =
