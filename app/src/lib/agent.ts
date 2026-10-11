@@ -67,3 +67,18 @@ export function useAgentLog(): AgentLogEntry[] {
     () => log,
   );
 }
+
+/**
+ * Starts an agent task: checks the helper is on, asks for screen capture on Android 10, then
+ * steps NextStep out of the way. Returns false if the helper still needs to be turned on.
+ */
+export async function startGoal(goal: string): Promise<boolean> {
+  if (!NextStepAgent.isAccessibilityEnabled()) {
+    NextStepAgent.openAccessibilitySettings();
+    return false;
+  }
+  if (NextStepAgent.needsScreenCapturePermission()) await NextStepAgent.requestScreenCapture();
+  NextStepAgent.startTask(goal);
+  NextStepAgent.minimizeApp();
+  return true;
+}

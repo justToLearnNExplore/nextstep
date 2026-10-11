@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { BigButton, Body, LanguageChips, Logo, Screen, TaskCard, Title } from '../components/ui';
 import { type StringKey, useI18n } from '../i18n';
-import { heardErrorKey, NextStepAgent } from '../lib/agent';
+import { heardErrorKey, NextStepAgent, startGoal } from '../lib/agent';
 import { colors, size } from '../theme';
 
 const CARDS: { label: StringKey; goal: StringKey; icon: 'basket' | 'pill' | 'music' | 'shield-check' }[] = [
@@ -26,20 +26,17 @@ export default function Talk() {
   const [listening, setListening] = useState(false);
 
   const start = async (goal: string) => {
-    if (!NextStepAgent.isAccessibilityEnabled()) {
-      setStatus(t('serviceOff'));
-      NextStepAgent.openAccessibilitySettings();
-      return;
-    }
-    // Android 10: ask once per session to see the screen (optional; text-only works without it).
-    if (NextStepAgent.needsScreenCapturePermission()) await NextStepAgent.requestScreenCapture();
-    NextStepAgent.startTask(goal);
-    NextStepAgent.minimizeApp();
+    if (!(await startGoal(goal))) setStatus(t('serviceOff'));
   };
 
   // The medicine card goes straight to NextStep's guided camera; other cards start an agent task.
+  // Groceries and medicine photos have their own screens; the others start a task directly.
   const open = (c: (typeof CARDS)[number]) =>
-    c.label === 'cardMedicinePhoto' ? router.push('/medicine?to=doctor') : start(t(c.goal));
+    c.label === 'cardMedicinePhoto'
+      ? router.push('/medicine?to=doctor')
+      : c.label === 'cardGroceries'
+        ? router.push('/grocery')
+        : start(t(c.goal));
 
   const speak = async () => {
     if (listening) {
