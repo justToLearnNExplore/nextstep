@@ -6,6 +6,7 @@ element list isn't enough, at medium resolution, with low thinking for routine s
 proposed action goes through the Guardian before it is returned to the phone.
 """
 
+import logging
 from typing import Any
 
 from google import genai
@@ -13,12 +14,13 @@ from google.genai import types
 
 from .config import settings
 from .guardian import ALLOWED_LINK_PREFIXES, classify
-from .i18n import language
+from .i18n import language, only_language, phrase
 from .protocol import GatedAction, Screen, StepResponse
 from .resilience import first_working
 from .rules import needs_screenshot
 from .store import TaskRecord
 
+log = logging.getLogger("nextstep")
 _client: genai.Client | None = None
 
 
@@ -95,6 +97,10 @@ Efficiency:
 - You may return up to 3 actions in one turn when they are safe and certain (e.g. tap the search
   box, type, press enter). Never batch past an irreversible step.
 - Use open_link to jump to search results when an allowed link fits the goal.
+- Every `intent` is shown and spoken to the user: say the exact action in a few words, present
+  tense, with what matters, e.g. "Tapping Auto, 86 rupees, 4 minutes away", "Typing milk in
+  search", "Adding 1 litre Amul milk to cart". Don't say "I am going to open the app" or repeat
+  what the user can already see; never explain your reasoning there.
 
 Safety rules (never break these):
 - Never type, read aloud or guess passwords, PINs, OTPs, UPI PINs, card numbers or bank
@@ -119,7 +125,7 @@ def task_prompt(task: TaskRecord, screen: Screen, hint: str | None) -> str:
     done = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(task.history[-15:])) or "(nothing yet)"
     parts = [
         f"Goal: {task.plan.operator_goal}",
-        f"Write every `intent` and user message in {lang.name}, short and simple.",
+        f"Write every `intent` and user message in {lang.name}, short and simple. {only_language(task.language)}",
         f"Steps done so far:\n{done}",
     ]
     if task.instructions:
@@ -183,12 +189,43 @@ async def next_actions(task: TaskRecord, screen: Screen, hint: str | None = None
         )
 
     models = [task.operator_model or settings.operator_model, *settings.operator_fallbacks]
-    task.operator_model, interaction = await first_working(models, create, what="operator")
+    try:
+        task.operator_model, interaction = await first_working(models, create, what="operator")
+    except Exception as e:
+        if not safety_blocked(e):
+            raise
+        # Gemini's input filter sometimes rejects a whole app screen (ads, maps, photos). Retry on
+        # the element list alone; if that is rejected too, the user does this one step.
+        log.warning("operator: input blocked by safety filter (image=%s)", send_image)
+        if not send_image:
+            return hand_over(task, screen)
+        model_input = model_input[:1]
+        try:
+            task.operator_model, interaction = await first_working(models, create, what="operator-noimage")
+        except Exception as e2:
+            if not safety_blocked(e2):
+                raise
+            log.warning("operator: still blocked without the screenshot; handing over")
+            return hand_over(task, screen)
     record_usage(task, interaction)
     task.turns += 1
     res = to_step_response(task, screen, interaction.steps)
     res.source = "ai"
     return res
+
+
+def safety_blocked(e: BaseException) -> bool:
+    code = getattr(e, "status_code", None) or getattr(e, "code", None)
+    return code == 400 and "safety" in str(e).lower()
+
+
+def hand_over(task: TaskRecord, screen: Screen) -> StepResponse:
+    """The user does this step themselves; the task continues after they tap Continue."""
+    msg = phrase(task.language, "ai_blocked")
+    gated = classify("hand_over_to_user", {"reason": msg, "intent": msg}, screen, task.language, task.consented)
+    gated.call_id = f"handover-{task.turns}"
+    task.turns += 1
+    return StepResponse(actions=[gated], status_text=msg, source="ai")
 
 
 def to_step_response(task: TaskRecord, screen: Screen, steps: list[Any]) -> StepResponse:

@@ -32,7 +32,6 @@
   "understand": "ನನ್ನ ಪರದೆ ವಿವರಿಸಿ",
   "close": "NextStep ಮುಚ್ಚಿ",
   "back": "ಹಿಂದೆ",
-  "stopNow": "ಈಗ ನಿಲ್ಲಿಸಿ",
   "working": "ಕೆಲಸ ಮಾಡುತ್ತಿದ್ದೇನೆ.",
   "thinking": "ಯೋಚಿಸುತ್ತಿದ್ದೇನೆ…",
   "looking": "ಪರದೆ ನೋಡುತ್ತಿದ್ದೇನೆ…",
@@ -110,7 +109,7 @@
   "goalOrderItem": "Blinkit ನಲ್ಲಿ {item} ಕ್ಯಾಶ್ ಆನ್ ಡೆಲಿವರಿಯಲ್ಲಿ ಆರ್ಡರ್ ಮಾಡು",
   "checkScam": "ಮೋಸ ಪರಿಶೀಲಿಸಿ",
   "scamChecking": "ಈ ಸಂದೇಶ ಪರಿಶೀಲಿಸುತ್ತಿದ್ದೇನೆ…",
-  "sayChange": "🎤 ಏನಾದರೂ ಸೇರಿಸಿ ಅಥವಾ ಬದಲಿಸಿ",
+  "sayChange": "ಏನಾದರೂ ಸೇರಿಸಿ ಅಥವಾ ಬದಲಿಸಿ",
   "sayChangePrompt": "ಏನು ಸೇರಿಸಬೇಕು ಅಥವಾ ಬದಲಿಸಬೇಕು?",
   "changeHeard": "ಅರ್ಥವಾಯಿತು: “{text}”. ಹಾಗೇ ಮಾಡುತ್ತೇನೆ.",
   "changeConfirm": "ಅರ್ಥವಾಯಿತು: “{text}”. ಮುಂದುವರಿಯಲೇ?",
@@ -146,9 +145,9 @@
   "checkingMissed": "ಏನು ತಪ್ಪಿಹೋಯಿತು ಎಂದು ನೋಡುತ್ತಿದ್ದೇನೆ…",
   "homeAddress": "ಮನೆಯ ವಿಳಾಸ",
   "homeAddressPlaceholder": "ಮನೆ ನಂ, ರಸ್ತೆ, ಪ್ರದೇಶ, ನಗರ",
-  "tellMe": "ನನಗೆ ಹೇಳಿ",
+  "tellMe": "ಮಾತನಾಡಿ",
   "tellMePrompt": "ಇಲ್ಲಿ ಏನು ಮಾಡಲಿ?",
-  "openNextStep": "ಆ್ಯಪ್ ತೆರೆಯಿರಿ",
+  "openNextStep": "NextStep ತೆರೆಯಿರಿ",
   "hideBubble": "ಮರೆಮಾಡಿ",
   "changeCheck": "ನೀವು ಹೇಳಿದ್ದು: “{text}”. ಸರಿಯೇ?",
   "namePrefixes": [
@@ -183,5 +182,10 @@
     "nillisi",
     "no",
     "stop"
-  ]
+  ],
+  "listeningNow": "ಕೇಳುತ್ತಿದ್ದೇನೆ… ಈಗ ಮಾತನಾಡಿ",
+  "gotItWait": "ಸರಿ, ಒಂದು ಕ್ಷಣ…",
+  "keepGoing": "ಮುಂದುವರಿಸಿ",
+  "stop": "ನಿಲ್ಲಿಸಿ",
+  "cancel": "ರದ್ದುಮಾಡಿ"
 }

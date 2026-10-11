@@ -22,9 +22,13 @@ _runners: dict[str, Runner] = {}
 _variants: dict[tuple[str, str], LlmAgent] = {}
 
 
-def agent_config(timeout_ms: int | None = None) -> types.GenerateContentConfig:
-    """Shared generation config. (Sampling params like temperature are deprecated for Gemini 3.x.)"""
-    return types.GenerateContentConfig(http_options=types.HttpOptions(timeout=timeout_ms or settings.agent_timeout_ms))
+def agent_config(timeout_ms: int | None = None, thinking: str | None = None) -> types.GenerateContentConfig:
+    """Shared generation config. (Sampling params like temperature are deprecated for Gemini 3.x.)
+    `thinking` ("low", ...) trades depth for speed where the user is waiting for the answer."""
+    return types.GenerateContentConfig(
+        http_options=types.HttpOptions(timeout=timeout_ms or settings.agent_timeout_ms),
+        thinking_config=types.ThinkingConfig(thinking_level=thinking.upper()) if thinking else None,
+    )
 
 
 def _variant(agent: LlmAgent, model: str) -> LlmAgent:

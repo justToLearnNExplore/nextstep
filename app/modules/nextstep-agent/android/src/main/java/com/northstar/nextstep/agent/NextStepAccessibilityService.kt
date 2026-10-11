@@ -36,6 +36,8 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
     runner = AgentRunner(this, prefs, overlay, reader, executor, voice)
     instance = this
     if (prefs.overlayEnabled) overlay.show()
+    // Connected while NextStep itself is open (e.g. right after an update): keep the bubble out of it.
+    if (rootInActiveWindow?.packageName == packageName) overlay.setBubbleHidden(true)
     AgentBus.emit("service", JSONObject().put("connected", true))
   }
 

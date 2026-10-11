@@ -23,6 +23,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import com.northstar.nextstep.agent.Prefs
 import com.northstar.nextstep.agent.R
+import com.northstar.nextstep.agent.voice.VoiceIO
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
@@ -42,7 +43,7 @@ object Palette {
 
 enum class Style { PRIMARY, OUTLINE, GO, STOP }
 
-data class PanelButton(val label: String, val style: Style, val onClick: () -> Unit)
+data class PanelButton(val label: String, val style: Style, val icon: Int? = null, val onClick: () -> Unit)
 
 interface OverlayHost {
   fun onUnderstandScreen()
@@ -59,6 +60,7 @@ interface OverlayHost {
  * The always-present NextStep bubble, its menu (2 big + 3 small buttons) and the task panel.
  * Drawn as TYPE_ACCESSIBILITY_OVERLAY windows, so no "draw over other apps" permission is needed.
  * Long-press and drag moves the bubble (position remembered), so it never blocks what's behind it.
+ * While a task runs, the only Stop is behind a tap on the bubble: one clear place, never in the way.
  */
 class BubbleOverlay(
   private val service: AccessibilityService,
@@ -71,7 +73,6 @@ class BubbleOverlay(
   private var bubbleRoot: LinearLayout? = null
   private var bubbleParams: WindowManager.LayoutParams? = null
   private var ring: StatusRing? = null
-  private var stopPill: TextView? = null
   private var popup: View? = null
   private var panel: View? = null
   private var panelToken = 0
@@ -83,7 +84,7 @@ class BubbleOverlay(
 
   private val screenW get() = service.resources.displayMetrics.widthPixels
   private val screenH get() = service.resources.displayMetrics.heightPixels
-  private val bubbleSize get() = dp(68)
+  private val bubbleSize get() = dp(64)
 
   // ---- lifecycle -------------------------------------------------------------------------
 
@@ -92,26 +93,20 @@ class BubbleOverlay(
     val statusRing = StatusRing(service)
     val head = FrameLayout(service).apply {
       addView(statusRing, FrameLayout.LayoutParams(bubbleSize, bubbleSize))
+      // The logo sits just inside the status ring, so the ring visibly wraps it.
       addView(ImageView(service).apply {
         setImageResource(R.drawable.ic_nextstep_logo)
         contentDescription = t("bubbleA11y", "NextStep. Tap for help. Press and hold to move.")
-      }, FrameLayout.LayoutParams(dp(56), dp(56), Gravity.CENTER))
+      }, FrameLayout.LayoutParams(bubbleSize - dp(12), bubbleSize - dp(12), Gravity.CENTER))
     }
-    val stop = pill(t("stopNow", "Stop now"), Style.STOP) { host.onStopNow() }.apply { visibility = View.GONE }
-    val root = LinearLayout(service).apply {
-      orientation = LinearLayout.VERTICAL
-      gravity = Gravity.CENTER_HORIZONTAL
-      addView(head)
-      addView(stop, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        .apply { topMargin = dp(6) })
-    }
-    // Default: top-right corner. Remembered after the user moves it.
-    val x = prefs.bubbleX.takeIf { it >= 0 } ?: (screenW - bubbleSize - dp(10))
+    val root = LinearLayout(service).apply { addView(head) }
+    // Default: top-left corner. Remembered after the user moves it.
+    val x = prefs.bubbleX.takeIf { it >= 0 } ?: dp(10)
     val y = prefs.bubbleY.takeIf { it >= 0 } ?: dp(36)
     val p = params(Gravity.TOP or Gravity.START, x = x, y = y)
     attachDrag(head, root, p)
     wm.addView(root, p)
-    bubbleRoot = root; bubbleParams = p; ring = statusRing; stopPill = stop
+    bubbleRoot = root; bubbleParams = p; ring = statusRing
     if (busy) setBusyNow(true)
   }
 
@@ -128,13 +123,13 @@ class BubbleOverlay(
 
   fun setState(state: BubbleState) = main.post { ring?.state = if (state == BubbleState.IDLE && busy) BubbleState.WORKING else state }
 
-  /** Working ring + Stop pill while a task runs. */
+  /** Working ring while a task runs. */
   fun setBusy(value: Boolean) = main.post { setBusyNow(value) }
 
   private fun setBusyNow(value: Boolean) {
     busy = value
     ring?.state = if (value) BubbleState.WORKING else BubbleState.IDLE
-    stopPill?.visibility = if (value) View.VISIBLE else View.GONE
+    if (!value) closePopupNow()
     if (value) bubbleRoot?.visibility = View.VISIBLE else if (hiddenInApp) bubbleRoot?.visibility = View.GONE
   }
 
@@ -213,8 +208,9 @@ class BubbleOverlay(
   private fun onBubbleTap() {
     when {
       popup != null -> closePopupNow()
-      // An accidental tap must never stop or change a task; it only shows status + Stop.
-      busy -> showPanel(t("working", "I'm working on it."), emptyList())
+      // An accidental tap must never stop or change a task: it opens a small card next to the
+      // bubble (leaving any question on screen untouched) with the one Stop button.
+      busy -> showStopCard()
       else -> showMenu()
     }
   }
@@ -222,22 +218,38 @@ class BubbleOverlay(
   fun showMenu(): Boolean = main.post {
     closePopupNow()
     val card = card().apply {
-      addView(bigButton(t("understand", "Explain my screen"), Style.OUTLINE, "👁") {
+      addView(bigButton(t("understand", "Explain my screen"), Style.OUTLINE, R.drawable.ic_ns_eye) {
         closePopupNow(); host.onUnderstandScreen()
       })
-      addView(bigButton(t("checkScam", "Check for scam"), Style.OUTLINE, "⚠") {
+      addView(bigButton(t("checkScam", "Check for scam"), Style.OUTLINE, R.drawable.ic_ns_shield) {
         closePopupNow(); host.onCheckScam()
       })
       addView(LinearLayout(service).apply {
         orientation = LinearLayout.HORIZONTAL
         layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
           .apply { topMargin = dp(8) }
-        addView(square("🎤", t("tellMe", "Tell me"), Style.PRIMARY) { closePopupNow(); host.onTellMe() })
-        addView(square("⌂", t("openNextStep", "Open app"), Style.OUTLINE) { closePopupNow(); host.onOpenNextStep() })
-        addView(square("✕", t("hideBubble", "Hide"), Style.OUTLINE) { closePopupNow(); host.onHide() })
+        addView(square(R.drawable.ic_ns_mic, null, t("tellMe", "Speak"), Style.PRIMARY) { closePopupNow(); host.onTellMe() })
+        addView(square(R.drawable.ic_nextstep_logo, "NextStep", t("openNextStep", "Open NextStep"), Style.OUTLINE, tint = false) {
+          closePopupNow(); host.onOpenNextStep()
+        })
+        addView(square(R.drawable.ic_ns_close, null, t("hideBubble", "Hide"), Style.OUTLINE) { closePopupNow(); host.onHide() })
       })
     }
     showPopup(card)
+  }
+
+  private fun showStopCard() {
+    closePopupNow()
+    showPopup(card().apply {
+      addView(TextView(service).apply {
+        text = t("working", "I'm working on it.")
+        setTextColor(Palette.INK)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+        setPadding(dp(4), 0, dp(4), 0)
+      })
+      addView(bigButton(t("stop", "Stop"), Style.STOP, R.drawable.ic_ns_stop) { closePopupNow(); host.onStopNow() })
+      addView(bigButton(t("keepGoing", "Keep going"), Style.OUTLINE, null) { closePopupNow() })
+    })
   }
 
   fun closePopup() = main.post { closePopupNow() }
@@ -267,10 +279,7 @@ class BubbleOverlay(
 
   // ---- task panel ------------------------------------------------------------------------
 
-  /**
-   * Bottom panel used for plans, confirmations, private-step hand-offs, explanations and scam
-   * warnings. A Stop button is always appended while a task is active.
-   */
+  /** Bottom panel used for plans, confirmations, private-step hand-offs, explanations and scam warnings. */
   fun showPanel(
     message: String, buttons: List<PanelButton>, tone: Style? = null, steps: List<String> = emptyList(),
     autoHideMs: Long? = null,
@@ -295,10 +304,7 @@ class BubbleOverlay(
             setPadding(0, dp(4), 0, 0)
           })
         }
-        buttons.forEach { b -> addView(bigButton(b.label, b.style, null) { b.onClick() }) }
-        if (busy && buttons.none { it.style == Style.STOP }) {
-          addView(bigButton(t("stopNow", "Stop now"), Style.STOP, null) { host.onStopNow() })
-        }
+        buttons.forEach { b -> addView(bigButton(b.label, b.style, b.icon) { b.onClick() }) }
       }
       wm.addView(card, params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, x = 0, y = dp(24),
         width = service.resources.displayMetrics.widthPixels - dp(24)))
@@ -306,6 +312,48 @@ class BubbleOverlay(
       // Only hide if no newer panel replaced this one in the meantime.
       autoHideMs?.let { ms -> main.postDelayed({ if (panelToken == token) hidePanel() }, ms) }
     }
+
+  /**
+   * The listening panel: a pulsing mic, "Listening… speak now", and bars that move with the
+   * user's voice. When they stop speaking it switches to [heardText] ("Got it, one moment…").
+   * Returns the callbacks VoiceIO drives.
+   */
+  fun showListening(prompt: String, heardText: String): VoiceIO.Feedback {
+    val bars = LevelBars(service)
+    val label = TextView(service)
+    main.post {
+      closePopupNow()
+      panel?.let { runCatching { wm.removeView(it) } }
+      ++panelToken
+      val card = card().apply {
+        addView(LinearLayout(service).apply {
+          orientation = LinearLayout.HORIZONTAL
+          gravity = Gravity.CENTER_VERTICAL
+          addView(ImageView(service).apply {
+            setImageResource(R.drawable.ic_ns_mic)
+            setColorFilter(Color.WHITE)
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(Palette.GO) }
+            val p = dp(10); setPadding(p, p, p, p)
+          }, LinearLayout.LayoutParams(dp(52), dp(52)))
+          addView(label.apply {
+            text = prompt
+            setTextColor(Palette.INK)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            typeface = Typeface.DEFAULT_BOLD
+            setPadding(dp(14), 0, 0, 0)
+          })
+        })
+        addView(bars, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(44)).apply { topMargin = dp(12) })
+      }
+      wm.addView(card, params(Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL, x = 0, y = dp(24),
+        width = service.resources.displayMetrics.widthPixels - dp(24)))
+      panel = card
+    }
+    return VoiceIO.Feedback(
+      onLevel = { bars.push(it) },
+      onCaptured = { label.text = heardText; bars.settle() },
+    )
+  }
 
   fun hidePanel() = main.post {
     panel?.let { runCatching { wm.removeView(it) } }
@@ -355,16 +403,25 @@ class BubbleOverlay(
     Style.OUTLINE -> Color.WHITE to Palette.INK
   }
 
+  private fun tinted(res: Int, color: Int, sizeDp: Int) = service.getDrawable(res)!!.mutate().apply {
+    setTint(color); setBounds(0, 0, dp(sizeDp), dp(sizeDp))
+  }
+
+  /** Full-width button; with an icon, the icon sits in a fixed left column and the text beside it. */
   private fun bigButton(
-    label: String, style: Style, glyph: String?, tall: Boolean = false, small: Boolean = false,
+    label: String, style: Style, icon: Int?, tall: Boolean = false, small: Boolean = false,
     onClick: () -> Unit,
   ) = TextView(service).apply {
     val (bg, fg) = colors(style)
-    text = if (glyph != null) "$glyph  $label" else label
+    text = label
     setTextColor(fg)
     setTextSize(TypedValue.COMPLEX_UNIT_SP, if (small) 18f else 21f)
     typeface = Typeface.DEFAULT_BOLD
-    gravity = if (style == Style.OUTLINE && glyph != null) Gravity.CENTER_VERTICAL else Gravity.CENTER
+    icon?.let {
+      setCompoundDrawablesRelative(tinted(it, fg, 26), null, null, null)
+      compoundDrawablePadding = dp(14)
+    }
+    gravity = if (icon != null) Gravity.CENTER_VERTICAL or Gravity.START else Gravity.CENTER
     background = rounded(bg, if (style == Style.OUTLINE) Palette.INK else null, 14)
     minHeight = dp(if (tall) 80 else 64)
     val h = dp(16); setPadding(h, dp(10), h, dp(10))
@@ -376,30 +433,34 @@ class BubbleOverlay(
     }
   }
 
-  /** Small square menu button: icon above a short label. */
-  private fun square(icon: String, label: String, style: Style, onClick: () -> Unit) = TextView(service).apply {
+  /** Small square menu button: an icon, with an optional short caption under it. */
+  private fun square(
+    icon: Int, caption: String?, a11y: String, style: Style, tint: Boolean = true, onClick: () -> Unit,
+  ) = LinearLayout(service).apply {
     val (bg, fg) = colors(style)
-    text = "$icon\n$label"
-    setTextColor(fg)
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-    typeface = Typeface.DEFAULT_BOLD
+    orientation = LinearLayout.VERTICAL
     gravity = Gravity.CENTER
     background = rounded(bg, if (style == Style.OUTLINE) Palette.INK else null, 14)
-    minHeight = dp(84)
+    minimumHeight = dp(72)
+    contentDescription = a11y
+    addView(ImageView(service).apply {
+      setImageResource(icon)
+      if (tint) setColorFilter(fg)
+      importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+    }, LinearLayout.LayoutParams(dp(if (caption == null) 34 else 30), dp(if (caption == null) 34 else 30)))
+    caption?.let {
+      addView(TextView(service).apply {
+        text = it
+        setTextColor(fg)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+        typeface = Typeface.DEFAULT_BOLD
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+      })
+    }
     layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
       marginStart = dp(4); marginEnd = dp(4)
     }
+    isClickable = true
     setOnClickListener { if (SystemClock.uptimeMillis() - panelShownAt >= TAP_GUARD_MS) onClick() }
-  }
-
-  private fun pill(label: String, style: Style, onClick: () -> Unit) = TextView(service).apply {
-    val (bg, fg) = colors(style)
-    text = label
-    setTextColor(fg)
-    setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-    typeface = Typeface.DEFAULT_BOLD
-    background = rounded(bg, null, 24)
-    setPadding(dp(18), dp(10), dp(18), dp(10))
-    setOnClickListener { onClick() }
   }
 }

@@ -67,13 +67,14 @@ class Prefs(context: Context) {
     set(v) = sp.edit().putString("labels", v).apply()
 
   /** Bubble position (px), -1 = default top-right. */
+  // Keys renamed when the default corner moved to the top-left, so every phone starts there once.
   var bubbleX: Int
-    get() = sp.getInt("bubbleX", -1)
-    set(v) = sp.edit().putInt("bubbleX", v).apply()
+    get() = sp.getInt("bubbleLeftX", -1)
+    set(v) = sp.edit().putInt("bubbleLeftX", v).apply()
 
   var bubbleY: Int
-    get() = sp.getInt("bubbleY", -1)
-    set(v) = sp.edit().putInt("bubbleY", v).apply()
+    get() = sp.getInt("bubbleLeftY", -1)
+    set(v) = sp.edit().putInt("bubbleLeftY", v).apply()
 
   var scamCheckEnabled: Boolean
     get() = sp.getBoolean("scamCheckEnabled", false)

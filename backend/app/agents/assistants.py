@@ -9,7 +9,7 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from ..config import settings
-from ..i18n import language
+from ..i18n import language, only_language
 from .runtime import agent_config, run_structured
 
 
@@ -43,7 +43,7 @@ grocery_agent = LlmAgent(
 
 async def read_grocery_list(image_b64: str, lang_tag: str) -> GroceryList:
     image = types.Part.from_bytes(data=base64.b64decode(image_b64), mime_type="image/jpeg")
-    text = f"User language: {language(lang_tag).name} ({lang_tag})"
+    text = f"User language: {language(lang_tag).name} ({lang_tag}). {only_language(lang_tag)}"
     return await run_structured(grocery_agent, GroceryList, [types.Part(text=text), image], settings.reasoning_fallbacks)
 
 
@@ -75,5 +75,5 @@ async def summarise_missed(lang_tag: str, calls: list[dict], messages: list[dict
 
     lines = [f"Missed call from {c.get('name') or c.get('number', 'unknown')} at {fmt_time(int(c.get('at', 0)))}" for c in calls[:30]]
     lines += [f"{m.get('app', 'Message')} from {m.get('from', 'someone')} at {fmt_time(int(m.get('at', 0)))}: {str(m.get('text', ''))[:300]}" for m in messages[:40]]
-    text = f"User language: {language(lang_tag).name} ({lang_tag})\nLast hour:\n" + ("\n".join(lines) or "(nothing)")
+    text = f"User language: {language(lang_tag).name} ({lang_tag}). {only_language(lang_tag)}\nLast hour:\n" + ("\n".join(lines) or "(nothing)")
     return await run_structured(missed_agent, Missed, [types.Part(text=text)], settings.fast_fallbacks)

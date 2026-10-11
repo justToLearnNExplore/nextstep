@@ -9,7 +9,7 @@ export type AgentEventKind =
   | 'error';
 
 /** Raw event from the native agent. `payload` is a JSON string. */
-export type NativeAgentEvent = { type: 'agent' | 'service'; payload: string };
+export type NativeAgentEvent = { type: 'agent' | 'service' | 'voice'; payload: string };
 
 export type AgentLogEntry = {
   at: number;

@@ -36,6 +36,8 @@ object SafetyGate {
   private val IRREVERSIBLE = Regex(
     "(place order|confirm order|order now|pay |pay$|^pay|proceed to pay|make payment|send|share|" +
       "install|uninstall|delete|remove account|transfer|buy now|submit|add address|save address|" +
+      "request (uber|ride|auto|moto|go)|book (now|ride|auto)|confirm (uber|auto|moto|go|ride|booking|pickup)|" +
+      "cancel (ride|trip)|yes, cancel|" +
       "भेजें|भेजो|ऑर्डर करें|भुगतान|इंस्टॉल|हटाएं|" +
       "ಕಳುಹಿಸು|ಕಳುಹಿಸಿ|ಆರ್ಡರ್ ಮಾಡಿ|ಪಾವತಿ|ಸ್ಥಾಪಿಸು)",
     RegexOption.IGNORE_CASE,

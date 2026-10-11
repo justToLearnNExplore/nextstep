@@ -49,8 +49,8 @@ export default function Home() {
         {name ? t('greetingNamed').replace('{name}', name) : t('greetingPlain')}
       </Text>
 
-      <View style={styles.center}>
-        <MicButton onHeard={start} label={t('tapAndSpeak')} />
+      <View style={styles.mic}>
+        <MicButton onHeard={start} label={t('tapAndSpeak')} size={200} />
         {status ? <Body style={{ textAlign: 'center' }}>{status}</Body> : null}
       </View>
 
@@ -79,13 +79,14 @@ export default function Home() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10 },
   iconButton: { width: size.touch, height: size.touch, alignItems: 'center', justifyContent: 'center' },
-  greeting: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 36, color: colors.ink, textAlign: 'center', marginTop: 8 },
-  center: { flex: 1, justifyContent: 'center', gap: 12 },
-  grid: { gap: 12, paddingBottom: 20 },
+  greeting: { fontFamily: fonts.bold, fontSize: 28, lineHeight: 36, color: colors.ink, textAlign: 'center', marginTop: 4 },
+  // Mic and helpers sit together under the greeting (not pushed to the bottom edge).
+  mic: { marginTop: 20, gap: 12 },
+  grid: { gap: 12, marginTop: 16, paddingBottom: 20 },
   row: { flexDirection: 'row', gap: 12 },
   tile: {
     flex: 1,
-    minHeight: 96,
+    minHeight: 104,
     borderRadius: 18,
     borderWidth: 2,
     borderColor: colors.ink,

@@ -8,7 +8,7 @@ from google.adk.agents import LlmAgent
 from google.genai import types
 
 from ..config import settings
-from ..i18n import language
+from ..i18n import language, only_language
 from ..protocol import MedicineInfo, MedicineRequest
 from .runtime import agent_config, run_structured
 
@@ -41,7 +41,7 @@ medicine_agent = LlmAgent(
 async def read_medicine(req: MedicineRequest) -> MedicineInfo:
     text = (
         f"Today: {dt.date.today().isoformat()}\n"
-        f"User language: {language(req.language).name} ({req.language})\n"
+        f"User language: {language(req.language).name} ({req.language}). {only_language(req.language)}\n"
         f"Recipient: {req.recipient}\n"
         f"OCR text from phone:\n{req.ocr_text[:2000] or '(none)'}"
     )

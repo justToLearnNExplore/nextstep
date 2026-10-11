@@ -66,7 +66,8 @@ class AgentRunner(
     stopped.set(false)
     overlay.setBusy(true)
     try {
-      overlay.showPanel(t("thinking", "Let me think about that…"), emptyList())
+      // Show what we heard right away, so the wait for the plan never feels like nothing happened.
+      overlay.showPanel("“$goal”\n\n" + t("thinking", "Let me think about that…"), emptyList())
       val screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
       val res = api.post("/v1/tasks", JSONObject()
         .put("goal", goal).put("language", lang).put("screen", screen.toJson()), timeoutMs = SLOW_CALL_MS)
@@ -185,7 +186,7 @@ class AgentRunner(
         // Hand over: the user types their PIN/OTP/password themselves. We never see or type it.
         val done = ask(a.optString("ask").ifBlank {
           t("privateStep", "This step is private. Please do it yourself, then tap Continue.")
-        }, t("continue", "Continue"), t("stopNow", "Stop now"), compact = true)
+        }, t("continue", "Continue"), t("cancel", "Cancel"), compact = true)
         if (!done && changeRequested) JSONObject().put("ok", false).put("error", "user_changed_plan")
         else if (!done) { stop(); JSONObject().put("ok", false).put("error", "user_stopped") }
         else JSONObject().put("ok", true).put("handed_to_user", true)
@@ -246,17 +247,26 @@ class AgentRunner(
     if (isRunning) return@execute
     overlay.showPanel(t("tellMePrompt", "What should I do here?"), emptyList())
     voice.speakAndWait(t("tellMePrompt", "What should I do here?"), lang)
+    val text = listenWithFeedback().text
+    if (text.isNullOrBlank()) return@execute
+    overlay.hidePanel()
+    startTask(text)
+  }
+
+  /**
+   * Listens with clear feedback: a beep and "Listening… speak now" with live voice bars, a second
+   * beep and "Got it, one moment…" when the user stops, then their words (or why nothing was heard).
+   */
+  private fun listenWithFeedback(): com.northstar.nextstep.agent.voice.Heard {
     overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.LISTENING)
-    overlay.showPanel(t("listening", "I'm listening…"), emptyList())
-    val heard = voice.listenAndWait(lang)
+    val feedback = overlay.showListening(t("listeningNow", "Listening… speak now"), t("gotItWait", "Got it, one moment…"))
+    val heard = voice.listenAndWait(lang, feedback)
     overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.IDLE)
     val text = heard.text
     if (text.isNullOrBlank()) {
       say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" }, "I didn't hear that."))
-      return@execute
     }
-    overlay.hidePanel()
-    startTask(text)
+    return heard
   }
 
   /**
@@ -395,12 +405,14 @@ class AgentRunner(
     overlay.showPanel(message, buttons, steps = steps)
     overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.WAITING)
     val spoken = CompletableFuture<Unit>()
-    voice.speak((listOf(message) + steps).joinToString(". "), lang) { spoken.complete(Unit) }
+    // Only the question is read aloud; the steps are on screen (reading them all made every
+    // task start with a long monologue).
+    voice.speak(message, lang) { spoken.complete(Unit) }
     runCatching { CompletableFuture.anyOf(spoken, decision).get(60, java.util.concurrent.TimeUnit.SECONDS) }
     if (!compact && !decision.isDone) {
       voice.listen(lang) { heard ->
         val text = heard.text ?: return@listen
-        when (val yn = yesNo(text)) {
+        when (val yn = yesNo(text, message)) {
           null -> if (taskId != null && isInstruction(text, message)) {
             // Not a yes/no: the user is telling us something else ("also add bread").
             heardChange = text; changeRequested = true; decision.complete(false)
@@ -429,7 +441,9 @@ class AgentRunner(
   }
 
   private fun changeButton(onTap: () -> Unit) =
-    PanelButton(t("sayChange", "🎤 Say something else"), Style.OUTLINE) { voice.stopSpeaking(); onTap() }
+    PanelButton(t("sayChange", "Add or change something"), Style.OUTLINE, com.northstar.nextstep.agent.R.drawable.ic_ns_mic) {
+      voice.stopSpeaking(); onTap()
+    }
 
   /**
    * The user wants to change the task mid-way: listen (unless we already heard it), send it to
@@ -462,27 +476,29 @@ class AgentRunner(
   private fun listenForChange(): String? {
     overlay.showPanel(t("sayChangePrompt", "What would you like to add or change?"), emptyList())
     voice.speakAndWait(t("sayChangePrompt", "What would you like to add or change?"), lang)
-    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.LISTENING)
-    overlay.showPanel(t("listening", "I'm listening…"), emptyList())
-    val heard = voice.listenAndWait(lang)
-    overlay.setState(com.northstar.nextstep.agent.overlay.BubbleState.IDLE)
-    return heard.text?.takeIf { it.isNotBlank() } ?: run {
-      say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" },
-        "I didn't hear that."))
-      null
-    }
+    return listenWithFeedback().text?.takeIf { it.isNotBlank() }
   }
 
-  private fun yesNo(heard: String): Boolean? {
+  /**
+   * Yes/no from speech. A "no" word that is part of the question itself doesn't count: to
+   * "Cancel your ride?" the answer "yes, cancel it" is a yes.
+   */
+  private fun yesNo(heard: String, question: String = ""): Boolean? {
     val h = heard.lowercase()
+    val q = question.lowercase()
     val yes = prefs.words("yesWords", listOf("yes", "ok", "okay", "sure", "do it", "haan", "ha", "हाँ", "हां", "ಹೌದು", "ಸರಿ"))
     val no = prefs.words("noWords", listOf("no", "stop", "don't", "cancel", "nahin", "नहीं", "ಬೇಡ", "ಇಲ್ಲ"))
+      .filter { !q.hasWord(it) || it in setOf("no", "nahin", "नहीं", "ಬೇಡ", "ಇಲ್ಲ") }
     return when {
-      no.any { h.contains(it) } -> false // "no" wins on ambiguity
-      yes.any { h.contains(it) } -> true
+      no.any { h.hasWord(it) } -> false // "no" wins on ambiguity
+      yes.any { h.hasWord(it) } -> true
       else -> null
     }
   }
+
+  /** Whole-word match ("no" must not match "now" or "know"); works for any script. */
+  private fun String.hasWord(w: String) =
+    Regex("(^|[\\s,.!?।])" + Regex.escape(w) + "($|[\\s,.!?।])").containsMatchIn(this)
 
   /**
    * Shows and speaks a message. Every message has an OK button; informational ones also close

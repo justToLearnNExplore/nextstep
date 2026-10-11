@@ -88,7 +88,8 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     if not task.history and link.startswith(ALLOWED_LINK_PREFIXES):
         # Rebuilt from each plan (it carries this task's search term), so never part of a recipe.
         task.rule_steps += 1
-        act = _gate(task, screen, "open_link", {"url": link, "intent": task.plan.summary[:80]}, f"link-{n}")
+        app = task.plan.target_app or "the app"
+        act = _gate(task, screen, "open_link", {"url": link, "intent": phrase(task.language, "opening_app", app=app)}, f"link-{n}")
         _remember(task, screen, [act], learnable=False)
         return StepResponse(actions=[act], status_text=act.intent, source="rule")
 

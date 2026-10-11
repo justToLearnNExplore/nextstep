@@ -27,6 +27,8 @@ _EN = {
     "scam_warning": "This message looks like a scam. Do not open the link and do not share any details or OTP.",
     "waiting_install": "Please tap Install. I'll continue as soon as it's installed.",
     "scam_safe": "I don't see signs of a scam here. Still, never share your OTP, PIN or password with anyone.",
+    "opening_app": "Opening {app}",
+    "ai_blocked": "I can't read this screen safely. Please do this step yourself, then tap Continue.",
 }
 
 LANGUAGES: dict[str, Language] = {
@@ -45,6 +47,8 @@ LANGUAGES: dict[str, Language] = {
             "scam_warning": "यह मैसेज धोखा लगता है। लिंक मत खोलिए और कोई जानकारी या ओटीपी मत बताइए।",
             "waiting_install": "कृपया Install दबाइए। इंस्टॉल होते ही मैं आगे बढ़ूँगा।",
             "scam_safe": "मुझे यहाँ धोखे के संकेत नहीं दिखते। फिर भी अपना ओटीपी, पिन या पासवर्ड किसी को न बताएँ।",
+            "opening_app": "{app} खोल रहा हूँ",
+            "ai_blocked": "मैं यह स्क्रीन ठीक से नहीं पढ़ पा रहा। कृपया यह कदम ख़ुद करें, फिर आगे बढ़ें दबाएँ।",
         },
     ),
     "kn-IN": Language(
@@ -61,6 +65,8 @@ LANGUAGES: dict[str, Language] = {
             "scam_warning": "ಈ ಸಂದೇಶ ಮೋಸದಂತೆ ಕಾಣುತ್ತದೆ. ಲಿಂಕ್ ತೆರೆಯಬೇಡಿ, ಯಾವುದೇ ವಿವರ ಅಥವಾ ಒಟಿಪಿ ಹಂಚಿಕೊಳ್ಳಬೇಡಿ.",
             "waiting_install": "ದಯವಿಟ್ಟು Install ಒತ್ತಿ. ಇನ್‌ಸ್ಟಾಲ್ ಆದ ತಕ್ಷಣ ನಾನು ಮುಂದುವರಿಸುತ್ತೇನೆ.",
             "scam_safe": "ಇಲ್ಲಿ ಮೋಸದ ಲಕ್ಷಣಗಳು ಕಾಣುತ್ತಿಲ್ಲ. ಆದರೂ ನಿಮ್ಮ ಒಟಿಪಿ, ಪಿನ್ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್ ಯಾರಿಗೂ ಹೇಳಬೇಡಿ.",
+            "opening_app": "{app} ತೆರೆಯುತ್ತಿದ್ದೇನೆ",
+            "ai_blocked": "ಈ ಪರದೆಯನ್ನು ಸರಿಯಾಗಿ ಓದಲು ಆಗುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು ಈ ಹಂತವನ್ನು ನೀವೇ ಮಾಡಿ, ನಂತರ ಮುಂದುವರಿಸಿ ಒತ್ತಿ.",
         },
     ),
 }
@@ -74,6 +80,15 @@ def language(tag: str) -> Language:
         if lang.tag.split("-")[0] == base:
             return lang
     return Language(tag, f"the language with BCP-47 tag '{tag}'", _EN)
+
+
+def only_language(tag: str) -> str:
+    """Prompt rule: one language end to end, whatever mix the user spoke (no Hinglish)."""
+    name = language(tag).name
+    return (
+        f"Write all user-facing text only in {name}. Never mix in another language (no Hinglish), "
+        "even if the user spoke a mix; keep only app names, prices and product names as they are."
+    )
 
 
 def phrase(tag: str, key: str, **kw: str) -> str:

@@ -30,3 +30,17 @@ def test_text_only_output_ends_task(task, blinkit_checkout):
 def test_hand_over_is_private(task, blinkit_checkout):
     res = to_step_response(task, blinkit_checkout, [call("hand_over_to_user", reason="Please enter the OTP")])
     assert res.actions[0].gate == Gate.PRIVATE and res.actions[0].ask == "Please enter the OTP"
+
+
+class _Blocked(Exception):
+    status_code = 400
+
+
+def test_safety_block_hands_step_to_user(task, blinkit_checkout):
+    from app.operator import hand_over, safety_blocked
+
+    assert safety_blocked(_Blocked("Request blocked due to safety violations (harmful content)."))
+    assert not safety_blocked(_Blocked("Invalid argument: tools"))
+    res = hand_over(task, blinkit_checkout)
+    assert not res.done and res.actions[0].name == "hand_over_to_user"
+    assert res.actions[0].gate == Gate.PRIVATE

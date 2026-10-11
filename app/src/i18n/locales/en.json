@@ -32,7 +32,6 @@
   "understand": "Explain my screen",
   "close": "Close NextStep",
   "back": "Back",
-  "stopNow": "Stop now",
   "working": "I'm working on it.",
   "thinking": "Let me think about that…",
   "looking": "Let me look at this screen…",
@@ -110,7 +109,7 @@
   "goalOrderItem": "Order {item} on Blinkit with cash on delivery",
   "checkScam": "Check for scam",
   "scamChecking": "Checking this message…",
-  "sayChange": "🎤 Add or change something",
+  "sayChange": "Add or change something",
   "sayChangePrompt": "What would you like to add or change?",
   "changeHeard": "Got it: “{text}”. I'll do that.",
   "changeConfirm": "Got it: “{text}”. Shall I go ahead?",
@@ -146,9 +145,9 @@
   "checkingMissed": "Checking what you missed…",
   "homeAddress": "Home address",
   "homeAddressPlaceholder": "House no, street, area, city",
-  "tellMe": "Tell me",
+  "tellMe": "Speak",
   "tellMePrompt": "What should I do here?",
-  "openNextStep": "Open app",
+  "openNextStep": "Open NextStep",
   "hideBubble": "Hide",
   "changeCheck": "You said: “{text}”. Is that right?",
   "namePrefixes": [
@@ -184,5 +183,10 @@
     "do not",
     "cancel",
     "wait"
-  ]
+  ],
+  "listeningNow": "Listening… speak now",
+  "gotItWait": "Got it, one moment…",
+  "keepGoing": "Keep going",
+  "stop": "Stop",
+  "cancel": "Cancel"
 }

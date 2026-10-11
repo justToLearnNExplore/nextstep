@@ -32,7 +32,6 @@
   "understand": "मेरी स्क्रीन समझाएँ",
   "close": "NextStep बंद करें",
   "back": "वापस",
-  "stopNow": "अभी रोकें",
   "working": "मैं काम कर रहा हूँ।",
   "thinking": "सोच रहा हूँ…",
   "looking": "स्क्रीन देख रहा हूँ…",
@@ -110,7 +109,7 @@
   "goalOrderItem": "Blinkit से {item} कैश ऑन डिलीवरी पर मंगाओ",
   "checkScam": "धोखा जाँचें",
   "scamChecking": "यह मैसेज जाँच रहा हूँ…",
-  "sayChange": "🎤 कुछ जोड़ें या बदलें",
+  "sayChange": "कुछ जोड़ें या बदलें",
   "sayChangePrompt": "क्या जोड़ना या बदलना है?",
   "changeHeard": "समझ गया: “{text}”। मैं यही करूँगा।",
   "changeConfirm": "समझ गया: “{text}”। क्या मैं आगे बढ़ूँ?",
@@ -146,9 +145,9 @@
   "checkingMissed": "देख रहा हूँ क्या छूटा…",
   "homeAddress": "घर का पता",
   "homeAddressPlaceholder": "मकान नं, गली, इलाका, शहर",
-  "tellMe": "मुझे बताइए",
+  "tellMe": "बोलिए",
   "tellMePrompt": "यहाँ क्या करूँ?",
-  "openNextStep": "ऐप खोलें",
+  "openNextStep": "NextStep खोलें",
   "hideBubble": "छुपाएँ",
   "changeCheck": "आपने कहा: “{text}”। क्या यह सही है?",
   "namePrefixes": [
@@ -192,5 +191,10 @@
     "रोको",
     "no",
     "stop"
-  ]
+  ],
+  "listeningNow": "सुन रहा हूँ… अब बोलिए",
+  "gotItWait": "समझ गया, एक पल…",
+  "keepGoing": "जारी रखें",
+  "stop": "रोकें",
+  "cancel": "रद्द करें"
 }

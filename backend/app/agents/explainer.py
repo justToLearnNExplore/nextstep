@@ -4,7 +4,7 @@ from google.adk.agents import LlmAgent
 from google.genai import types
 
 from ..config import settings
-from ..i18n import language
+from ..i18n import language, only_language
 from ..protocol import Screen, ScreenExplanation
 from .runtime import agent_config, image_part, run_structured
 
@@ -37,7 +37,7 @@ explainer_agent = LlmAgent(
 
 
 async def explain_screen(lang_tag: str, screen: Screen) -> ScreenExplanation:
-    text = f"User language: {language(lang_tag).name} ({lang_tag})\nAccessibility tree:\n{screen.summary()}"
+    text = f"User language: {language(lang_tag).name} ({lang_tag}). {only_language(lang_tag)}\nAccessibility tree:\n{screen.summary()}"
     return await run_structured(
         explainer_agent,
         ScreenExplanation,

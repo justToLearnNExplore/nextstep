@@ -114,8 +114,8 @@ class Param(BaseModel):
 class TaskPlan(BaseModel):
     """Planner output, written in the user's language, read aloud before consent."""
 
-    summary: str = Field(description="One or two short sentences: what NextStep will do. Ends with a question asking for approval.")
-    steps: list[str] = Field(description="3-6 very short steps a senior can follow, in the user's language.")
+    summary: str = Field(description="One short sentence (read aloud): the concrete result NextStep will get. Ends with a question asking for approval.")
+    steps: list[str] = Field(description="2-4 very short concrete actions shown on screen, in the user's language.")
     target_app: str | None = Field(default=None, description="Main app name, e.g. 'Blinkit', 'WhatsApp', 'YouTube'.")
     target_package: str | None = Field(default=None, description="Android package of the target app if known.")
     sensitive_steps: list[str] = Field(default_factory=list, description="Steps where NextStep will stop and ask (send, order, install, payment).")
@@ -130,7 +130,7 @@ class TaskPlan(BaseModel):
     )
     deep_link: str | None = Field(
         default=None,
-        description="Optional https link that jumps straight to the right screen, only from: youtube.com/results?search_query=..., blinkit.com/s/?q=...",
+        description="Optional https link that jumps straight to the right screen, only from: youtube.com/results?search_query=..., blinkit.com/s/?q=..., m.uber.com/ul/?action=setPickup...",
     )
     special_flow: Literal["medicine_photo"] | None = Field(
         default=None, description="'medicine_photo' when the user wants to photograph a medicine/prescription and share it."

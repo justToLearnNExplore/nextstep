@@ -49,12 +49,15 @@ export function BigButton({
   tone = 'primary',
   icon,
   tall,
+  align = 'center',
 }: {
   label: string;
   onPress: () => void;
   tone?: Tone;
   icon?: IconName;
   tall?: boolean;
+  /** 'start' for lists of choices: icon in a fixed column, text left-aligned, wrapped lines line up. */
+  align?: 'center' | 'start';
 }) {
   const t = TONES[tone];
   return (
@@ -66,11 +69,16 @@ export function BigButton({
         styles.button,
         { backgroundColor: t.bg, minHeight: tall ? 88 : size.touch },
         t.border ? { borderWidth: 2, borderColor: t.border } : null,
+        align === 'start' && styles.buttonStart,
         pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
       ]}
     >
-      {icon ? <MaterialCommunityIcons name={icon} size={tall ? 34 : 28} color={t.fg} /> : null}
-      <Text style={[styles.buttonText, { color: t.fg }]}>{label}</Text>
+      {icon ? (
+        <View style={align === 'start' ? styles.iconColumn : null}>
+          <MaterialCommunityIcons name={icon} size={tall ? 34 : 28} color={t.fg} />
+        </View>
+      ) : null}
+      <Text style={[styles.buttonText, { color: t.fg }, align === 'start' && styles.buttonTextStart]}>{label}</Text>
     </Pressable>
   );
 }
@@ -125,7 +133,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 14,
   },
-  buttonText: { fontFamily: fonts.bold, fontSize: size.large },
+  buttonText: { fontFamily: fonts.bold, fontSize: size.large, flexShrink: 1, textAlign: 'center' },
+  buttonStart: { justifyContent: 'flex-start', gap: 16, paddingHorizontal: 18 },
+  iconColumn: { width: 40, alignItems: 'center' },
+  buttonTextStart: { flex: 1, textAlign: 'left' },
   card: {
     flex: 1,
     aspectRatio: 1,

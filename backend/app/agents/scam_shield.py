@@ -8,7 +8,7 @@ from google.adk.agents import LlmAgent
 from google.genai import types
 
 from ..config import settings
-from ..i18n import language, phrase
+from ..i18n import language, only_language, phrase
 from ..official_sites import CYBER_CRIME, find_by_alias, find_by_name, is_lookalike, is_official_domain
 from ..protocol import ScamCheckRequest, ScamCheckResponse, ScamVerdict, Screen
 from .runtime import agent_config, run_structured
@@ -84,7 +84,7 @@ async def check_message(req: ScamCheckRequest) -> ScamCheckResponse:
         verdict = await run_structured(
             scam_agent,
             ScamVerdict,
-            [types.Part(text=f"User language: {language(req.language).name} ({req.language})\n"
+            [types.Part(text=f"User language: {language(req.language).name} ({req.language}). {only_language(req.language)}\n"
                              f"Sender: {req.sender}\nApp: {req.source}\nMessage:\n{req.text}")],
             settings.fast_fallbacks,
         )

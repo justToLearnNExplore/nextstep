@@ -95,9 +95,9 @@ export default function Phone() {
     <Screen>
       <ScrollView contentContainerStyle={styles.body}>
         <Title>{t('phoneHelpTitle')}</Title>
-        <BigButton label={t('noSound')} icon="volume-off" tone="outline" tall onPress={noSound} />
-        <BigButton label={t('phoneSilent')} icon="bell-off" tone="outline" tall onPress={silent} />
-        <BigButton label={t('whatDidIMiss')} icon="clock-outline" tone="outline" tall onPress={missed} />
+        <BigButton label={t('noSound')} icon="volume-off" tone="outline" tall align="start" onPress={noSound} />
+        <BigButton label={t('phoneSilent')} icon="bell-off" tone="outline" tall align="start" onPress={silent} />
+        <BigButton label={t('whatDidIMiss')} icon="clock-outline" tone="outline" tall align="start" onPress={missed} />
         {message ? (
           <View style={styles.answer}>
             <Body>{busy ? t('checkingMissed') : message}</Body>
@@ -120,7 +120,7 @@ export default function Phone() {
 }
 
 const styles = StyleSheet.create({
-  body: { paddingVertical: 24, gap: 16 },
+  body: { paddingTop: 24, paddingBottom: 32, gap: 14 },
   answer: { backgroundColor: colors.amber, borderRadius: size.radius, padding: 16 },
   row: { flexDirection: 'row', gap: 12 },
 });

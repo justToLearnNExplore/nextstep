@@ -15,7 +15,7 @@ enum class BubbleState { IDLE, WORKING, LISTENING, WAITING }
 
 /**
  * The ring drawn around the bubble logo. Calm by design (older users, long tasks):
- *  WORKING   – one green arc turning slowly (one turn every 2 s)
+ *  WORKING   – a pale full ring around the logo with a green arc turning slowly (one turn every 2 s)
  *  LISTENING – a soft saffron ring gently breathing
  *  WAITING   – a steady saffron ring and a small green "?" badge: NextStep needs the user
  *  IDLE      – nothing
@@ -23,7 +23,7 @@ enum class BubbleState { IDLE, WORKING, LISTENING, WAITING }
  */
 class StatusRing(context: Context) : View(context) {
   private val density = resources.displayMetrics.density
-  private val stroke = 3.5f * density
+  private val stroke = 4f * density
   private val arcPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     style = Paint.Style.STROKE; strokeWidth = stroke; strokeCap = Paint.Cap.ROUND
   }
@@ -58,13 +58,15 @@ class StatusRing(context: Context) : View(context) {
   }.getOrDefault(true)
 
   override fun onDraw(canvas: Canvas) {
-    val inset = stroke / 2 + density
+    val inset = stroke / 2 + density / 2
     oval.set(inset, inset, width - inset, height - inset)
     when (state) {
       BubbleState.IDLE -> Unit
       BubbleState.WORKING -> {
+        arcPaint.color = Palette.MIST
+        canvas.drawOval(oval, arcPaint)
         arcPaint.color = Palette.GO
-        canvas.drawArc(oval, phase * 360f - 90f, 110f, false, arcPaint)
+        canvas.drawArc(oval, phase * 360f - 90f, 120f, false, arcPaint)
       }
       BubbleState.LISTENING -> {
         arcPaint.color = Palette.SAFFRON

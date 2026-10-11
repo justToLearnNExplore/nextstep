@@ -27,7 +27,7 @@ MESSAGE_APPS = {"com.whatsapp", "com.whatsapp.w4b", "com.google.android.apps.mes
 IRREVERSIBLE = re.compile(
     r"(place order|confirm order|order now|\bpay\b|proceed to pay|make payment|\bsend\b|\bshare\b|"
     r"install|uninstall|delete|remove account|transfer|buy now|submit|add address|save address|"
-    r"request (uber|ride|auto|moto|go)|book (now|ride|auto)|\bconfirm (uber|auto|moto|go|ride|booking)|cancel (ride|trip)|"
+    r"request (uber|ride|auto|moto|go)|book (now|ride|auto)|\bconfirm (uber|auto|moto|go|ride|booking|pickup)|cancel (ride|trip)|yes, cancel|"
     r"भेजें|भेजो|ऑर्डर करें|भुगतान|इंस्टॉल|हटाएं|"
     r"ಕಳುಹಿಸು|ಕಳುಹಿಸಿ|ಆರ್ಡರ್ ಮಾಡಿ|ಪಾವತಿ|ಸ್ಥಾಪಿಸು)",
     re.I,

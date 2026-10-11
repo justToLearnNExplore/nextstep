@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.ToneGenerator
 import android.os.Handler
 import android.os.Looper
 import android.speech.tts.TextToSpeech
@@ -13,6 +15,7 @@ import android.speech.tts.UtteranceProgressListener
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.ContextCompat
+import com.northstar.nextstep.agent.AgentBus
 import com.northstar.nextstep.agent.Prefs
 import com.northstar.nextstep.agent.agent.BackendClient
 import com.northstar.nextstep.agent.agent.BackendError
@@ -54,8 +57,11 @@ class VoiceIO(private val context: Context) {
   private var ttsReady = false
   private val tts = TextToSpeech(context.applicationContext) { ttsReady = it == TextToSpeech.SUCCESS }
 
-  /** Slightly slower than default: easier to follow for older listeners. */
-  var speechRate = 0.9f
+  /** Normal pace: slower speech made every step feel laggy. */
+  var speechRate = 1.0f
+
+  /** Short beeps so the user knows exactly when the mic opens and when it has heard them. */
+  private val tones = runCatching { ToneGenerator(AudioManager.STREAM_MUSIC, 80) }.getOrNull()
 
   fun speak(text: String, lang: String, onDone: (() -> Unit)? = null) {
     if (!ttsReady || text.isBlank()) { onDone?.invoke(); return }
@@ -80,31 +86,52 @@ class VoiceIO(private val context: Context) {
 
   fun stopSpeaking() = tts.stop()
 
+  /**
+   * What the listener is doing, for on-screen feedback: [onLevel] gets the voice level (0..1)
+   * every 100 ms while the mic is open; [onCaptured] fires once the user has finished speaking
+   * (before transcription). Both run on the main thread. The same states also go to the app via
+   * AgentBus ("voice" events), so the in-app mic shows them too.
+   */
+  class Feedback(val onLevel: (Float) -> Unit = {}, val onCaptured: () -> Unit = {})
+
   /** Records until the speaker pauses, transcribes, and calls back on the main thread. */
-  fun listen(lang: String, onResult: (Heard) -> Unit) {
+  fun listen(lang: String, feedback: Feedback? = null, onResult: (Heard) -> Unit) {
     cancelled = false
     recorder.execute {
-      val heard = runCatching { recordAndTranscribe(lang) }
+      val heard = runCatching { recordAndTranscribe(lang, feedback) }
         .getOrElse { Log.e(TAG, "listen failed", it); Heard(null, "network") }
       Log.i(TAG, "listen($lang) -> error=${heard.error} chars=${heard.text?.length ?: 0}")
+      voiceEvent("done")
       main.post { onResult(heard) }
     }
   }
 
-  fun listenAndWait(lang: String, timeoutMs: Long = 30_000): Heard {
+  fun listenAndWait(lang: String, feedback: Feedback? = null, timeoutMs: Long = 30_000): Heard {
     val f = CompletableFuture<Heard>()
-    listen(lang) { f.complete(it) }
+    listen(lang, feedback) { f.complete(it) }
     return runCatching { f.get(timeoutMs, TimeUnit.MILLISECONDS) }.getOrDefault(Heard(null, "silence"))
   }
 
+  private fun voiceEvent(state: String, level: Float = 0f) =
+    AgentBus.emit("voice", JSONObject().put("state", state).put("level", level.toDouble()))
+
+  private fun beep(tone: Int, ms: Int) { runCatching { tones?.startTone(tone, ms) } }
+
   fun cancelListening() { cancelled = true }
 
-  private fun recordAndTranscribe(lang: String): Heard {
+  private fun recordAndTranscribe(lang: String, feedback: Feedback?): Heard {
     if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
       return Heard(null, "permission")
     }
-    val pcm = record() ?: return Heard(null, "mic_unavailable")
+    // "Speak now" beep, then a moment for it to fade so the mic doesn't take it as the noise floor.
+    beep(ToneGenerator.TONE_PROP_BEEP, 120)
+    Thread.sleep(220)
+    voiceEvent("listening")
+    val pcm = record(feedback) ?: return Heard(null, "mic_unavailable")
     if (cancelled) return Heard(null, "cancelled")
+    if (pcm.speech) beep(ToneGenerator.TONE_PROP_ACK, 150)
+    voiceEvent("captured")
+    feedback?.let { main.post(it.onCaptured) }
     if (pcm.peak < MIC_DEAD_PEAK) return Heard(null, "mic_silent")
     // Even if our simple detector didn't hear speech, let Google decide: phone mics differ a lot.
 
@@ -131,8 +158,10 @@ class VoiceIO(private val context: Context) {
   /**
    * Simple voice-activity detection: wait up to [WAIT_FOR_SPEECH_MS] for speech, then stop after
    * [END_SILENCE_MS] of quiet (older users pause; this is deliberately generous) or [MAX_MS].
+   * "Quiet" is relative to how loud this speaker was: with background noise (TV, fan, traffic)
+   * the room never drops below the start threshold, which used to keep the mic open for 12 s.
    */
-  private fun record(): Pcm? {
+  private fun record(feedback: Feedback?): Pcm? {
     val minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
     // MIC applies the phone's automatic gain; VOICE_RECOGNITION is raw and very quiet on many
     // phones (e.g. Motorola), which made speech look like silence.
@@ -146,6 +175,7 @@ class VoiceIO(private val context: Context) {
     val frame = ShortArray(RATE / 10) // 100 ms
     val out = ByteArrayOutputStream()
     var elapsed = 0; var quiet = 0; var speech = false; var peak = 0.0; var floor = -1.0
+    var speechLevel = 0.0 // running average of the voice while speaking
     try {
       rec.startRecording()
       while (!cancelled && elapsed < MAX_MS) {
@@ -160,10 +190,16 @@ class VoiceIO(private val context: Context) {
         val rms = sqrt(sum / n)
         peak = maxOf(peak, rms)
         elapsed += 100
+        val level = (rms / 3000.0).coerceIn(0.0, 1.0).toFloat()
+        voiceEvent("level", level)
+        feedback?.let { main.post { it.onLevel(level) } }
         // The first 300 ms set the room's noise floor.
         if (elapsed <= 300) { floor = if (floor < 0) rms else (floor + rms) / 2; continue }
         val threshold = maxOf(floor * 2.0, SPEECH_MIN_RMS)
-        if (rms > threshold) { speech = true; quiet = 0 } else if (speech) quiet += 100
+        val quietBelow = maxOf(threshold, speechLevel * QUIET_RATIO)
+        if (!speech && rms > threshold) { speech = true; speechLevel = rms; quiet = 0 }
+        else if (speech && rms > quietBelow) { speechLevel = speechLevel * 0.8 + rms * 0.2; quiet = 0 }
+        else if (speech) quiet += 100
         if (speech && quiet >= END_SILENCE_MS) break
         if (!speech && elapsed >= WAIT_FOR_SPEECH_MS) break
       }
@@ -179,6 +215,7 @@ class VoiceIO(private val context: Context) {
     cancelled = true
     recorder.shutdownNow()
     tts.shutdown()
+    tones?.release()
   }
 
   companion object {
@@ -186,7 +223,9 @@ class VoiceIO(private val context: Context) {
     const val RATE = 16_000
     private const val MAX_MS = 12_000
     private const val WAIT_FOR_SPEECH_MS = 7_000
-    private const val END_SILENCE_MS = 1_400
+    private const val END_SILENCE_MS = 1_200
+    /** Below this share of the speaker's own level counts as a pause. */
+    private const val QUIET_RATIO = 0.3
     private const val SPEECH_MIN_RMS = 150.0
     private const val MIC_DEAD_PEAK = 30.0
   }
