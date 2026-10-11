@@ -133,6 +133,9 @@
   "itemFruit": "फल",
   "checkScam": "धोखा जाँचें",
   "scamChecking": "यह मैसेज जाँच रहा हूँ…",
+  "sayChange": "🎤 कुछ और बोलें",
+  "sayChangePrompt": "बताइए क्या बदलना है।",
+  "changeHeard": "समझ गया: “{text}”। मैं यही करूँगा।",
   "namePrefixes": [
     "मेरा नाम",
     "मैं हूँ",

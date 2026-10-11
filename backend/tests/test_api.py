@@ -81,3 +81,25 @@ def test_stt_endpoint(monkeypatch):
     monkeypatch.setattr(main, "transcribe", fake)
     r = TestClient(main.app).post("/v1/stt", json={"language": "kn-IN", "audio_b64": "AAAA"})
     assert r.json() == {"text": "ಹಾಲು ಆರ್ಡರ್ ಮಾಡು"}
+
+
+
+def test_instruction_mid_task_reaches_the_operator(monkeypatch):
+    seen = {}
+
+    async def fake_plan(goal, lang, screen, installed=None):
+        return TaskPlan(summary="s", steps=[], operator_goal=goal, skill_key="blinkit_order_item", params={"item": "milk"})
+
+    async def fake_next(task, screen, hint=None):
+        seen["instructions"] = list(task.instructions)
+        seen["skill"] = task.skill_id
+        return StepResponse(done=True, message="ok")
+
+    monkeypatch.setattr(main, "plan_task", fake_plan)
+    monkeypatch.setattr(main.agent_loop, "next_actions", fake_next)
+    c = TestClient(main.app)
+    tid = c.post("/v1/tasks", json={"goal": "order milk", "screen": SCREEN}).json()["task_id"]
+    c.post(f"/v1/tasks/{tid}/consent", json={"approved": True})
+    assert c.post(f"/v1/tasks/{tid}/instruct", json={"text": "also add one bread"}).json() == {"status": "ok"}
+    c.post(f"/v1/tasks/{tid}/step", json={"screen": SCREEN})
+    assert seen == {"instructions": ["also add one bread"], "skill": None}

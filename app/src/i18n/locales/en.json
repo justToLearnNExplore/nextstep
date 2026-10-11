@@ -133,6 +133,9 @@
   "itemFruit": "Fruit",
   "checkScam": "Check for scam",
   "scamChecking": "Checking this message…",
+  "sayChange": "🎤 Say something else",
+  "sayChangePrompt": "Tell me what to change.",
+  "changeHeard": "Got it: “{text}”. I'll do that.",
   "namePrefixes": [
     "my name is",
     "my name's",

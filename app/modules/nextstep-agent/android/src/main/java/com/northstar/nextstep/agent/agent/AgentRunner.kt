@@ -50,6 +50,9 @@ class AgentRunner(
   private val stopped = AtomicBoolean(false)
   @Volatile private var taskId: String? = null
   @Volatile private var pendingDecision: CompletableFuture<Boolean>? = null
+  /** Set when the user wants to say something else; holds what they said, if already heard. */
+  @Volatile private var changeRequested = false
+  @Volatile private var heardChange: String? = null
 
   val isRunning get() = taskId != null
 
@@ -117,12 +120,13 @@ class AgentRunner(
     var results = JSONArray()
     repeat(MAX_TURNS) {
       if (stopped.get()) return
+      if (changeRequested) takeChange(id)
       val screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
       val res = api.post("/v1/tasks/$id/step", JSONObject()
         .put("screen", screen.toJson()).put("results", results), timeoutMs = SLOW_CALL_MS)
       log("step", res)
       res.optString("status_text").takeIf { it.isNotBlank() }?.let {
-        overlay.showPanel(it, emptyList(), steps = res.optJSONArray("done_steps").strings())
+        overlay.showPanel(it, listOf(changeButton { changeRequested = true }), steps = res.optJSONArray("done_steps").strings())
       }
       if (res.optBoolean("done")) {
         say(res.optString("message", t("allDone", "All done.")), finalMessage = true)
@@ -136,7 +140,8 @@ class AgentRunner(
         val result = runGated(a, screen.packageName, screen.nodes, screen.width, screen.height)
         results.put(JSONObject().put("call_id", a.optString("call_id")).put("name", a.getString("name"))
           .put("result", result))
-        if (result.optString("error") == "user_declined" && a.optString("gate") != "auto") break
+        if (result.optString("error") in setOf("user_declined", "user_changed_plan") && a.optString("gate") != "auto") break
+        if (changeRequested) break
       }
     }
     say(t("tooLong", "This is taking too long, so I stopped. Nothing was ordered or sent."), finalMessage = true)
@@ -163,7 +168,8 @@ class AgentRunner(
       Gate.CONFIRM -> {
         val yes = ask(prompt.ifBlank { t("confirmGeneric", "Shall I do this?") },
           a.optString("yes_label").ifBlank { t("yes", "Yes") }, t("no", "No"))
-        if (!yes) JSONObject().put("ok", false).put("error", "user_declined")
+        if (!yes && changeRequested) JSONObject().put("ok", false).put("error", "user_changed_plan")
+        else if (!yes) JSONObject().put("ok", false).put("error", "user_declined")
         else overlay.whileHidden { executor.execute(name, args, w, h) }.put("safety_acknowledgement", true)
       }
       Gate.PRIVATE -> {
@@ -171,7 +177,8 @@ class AgentRunner(
         val done = ask(a.optString("ask").ifBlank {
           t("privateStep", "This step is private. Please do it yourself, then tap Continue.")
         }, t("continue", "Continue"), t("stopNow", "Stop now"), compact = true)
-        if (!done) { stop(); JSONObject().put("ok", false).put("error", "user_stopped") }
+        if (!done && changeRequested) JSONObject().put("ok", false).put("error", "user_changed_plan")
+        else if (!done) { stop(); JSONObject().put("ok", false).put("error", "user_stopped") }
         else JSONObject().put("ok", true).put("handed_to_user", true)
       }
       Gate.BLOCKED -> {
@@ -363,15 +370,26 @@ class AgentRunner(
     pendingDecision = decision
     // Buttons work immediately: a tap answers and cuts the speech short.
     val respond = { yes: Boolean -> if (decision.complete(yes)) voice.stopSpeaking() }
-    overlay.showPanel(message, listOf(
+    val buttons = mutableListOf(
       PanelButton(yesLabel, if (compact) Style.PRIMARY else Style.GO) { respond(true) },
       PanelButton(noLabel, if (compact) Style.STOP else Style.OUTLINE) { respond(false) },
-    ), steps = steps)
+    )
+    if (taskId != null) buttons += changeButton { changeRequested = true; respond(false) }
+    overlay.showPanel(message, buttons, steps = steps)
     val spoken = CompletableFuture<Unit>()
     voice.speak((listOf(message) + steps).joinToString(". "), lang) { spoken.complete(Unit) }
     runCatching { CompletableFuture.anyOf(spoken, decision).get(60, java.util.concurrent.TimeUnit.SECONDS) }
     if (!compact && !decision.isDone) {
-      voice.listen(lang) { heard -> heard.text?.let { yesNo(it) }?.let { decision.complete(it) } }
+      voice.listen(lang) { heard ->
+        val text = heard.text ?: return@listen
+        when (val yn = yesNo(text)) {
+          null -> if (taskId != null && text.length > 3) {
+            // Not a yes/no: the user is telling us something else ("also add bread").
+            heardChange = text; changeRequested = true; decision.complete(false)
+          }
+          else -> decision.complete(yn)
+        }
+      }
     }
     val answer = runCatching { decision.get() }.getOrDefault(false)
     voice.cancelListening()
@@ -379,6 +397,32 @@ class AgentRunner(
     overlay.hidePanel()
     log("decision", JSONObject().put("message", message).put("approved", answer))
     return answer && !stopped.get()
+  }
+
+  private fun changeButton(onTap: () -> Unit) =
+    PanelButton(t("sayChange", "🎤 Say something else"), Style.OUTLINE) { voice.stopSpeaking(); onTap() }
+
+  /**
+   * The user wants to change the task mid-way: listen (unless we already heard it), send it to
+   * the operator, and confirm back what we understood. Runs on the worker thread.
+   */
+  private fun takeChange(id: String) {
+    changeRequested = false
+    val text = heardChange ?: run {
+      overlay.showPanel(t("sayChangePrompt", "Tell me what to change."), emptyList())
+      voice.speakAndWait(t("sayChangePrompt", "Tell me what to change."), lang)
+      overlay.showPanel(t("listening", "I'm listening…"), emptyList())
+      val heard = voice.listenAndWait(lang)
+      heard.text ?: run {
+        say(t(when (heard.error) { "mic_silent" -> "micSilent"; "network" -> "networkError"; else -> "didNotHear" },
+          "I didn't hear that."))
+        return
+      }
+    }
+    heardChange = null
+    runCatching { api.post("/v1/tasks/$id/instruct", JSONObject().put("text", text)) }
+      .onSuccess { say(t("changeHeard", "Got it: “{text}”. I'll do that.").replace("{text}", text)) }
+      .onFailure { Log.e(TAG, "instruct failed", it); say(explain(it as? Exception ?: Exception(it))) }
   }
 
   private fun yesNo(heard: String): Boolean? {

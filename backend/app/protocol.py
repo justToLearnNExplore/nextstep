@@ -181,6 +181,10 @@ class ConsentRequest(BaseModel):
     approved: bool
 
 
+class InstructRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=500)
+
+
 class ActionResult(BaseModel):
     call_id: str
     name: str

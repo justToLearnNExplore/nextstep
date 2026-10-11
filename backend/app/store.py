@@ -39,6 +39,7 @@ class TaskRecord(BaseModel):
     skill_id: str | None = None  # skill being replayed
     replay_index: int = 0
     last_failed: bool = False
+    instructions: list[str] = Field(default_factory=list)  # what the user said mid-task, in order
     awaiting_install: str | None = None  # package the user is installing from the Play Store
     last_signature: str = ""  # previous action, to catch the agent repeating itself
     repeats: int = 0

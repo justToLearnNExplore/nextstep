@@ -44,7 +44,7 @@ def absorb_results(task: TaskRecord, results: list[dict[str, Any]]) -> None:
                 task.history[-1] = "The app is installed and open now"
             if sent.get("learn") and sent.get("step"):
                 task.trace.append(SkillStep.model_validate(sent["step"]))
-        elif res.get("error") != "user_declined":
+        elif res.get("error") not in ("user_declined", "user_changed_plan"):
             task.history.append(f"(failed) {intent[:100]}")
             task.last_failed = True
 

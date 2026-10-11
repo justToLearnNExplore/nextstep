@@ -23,6 +23,7 @@ from .stt import transcribe
 from .protocol import (
     ClientEvent,
     ConsentRequest,
+    InstructRequest,
     ExplainRequest,
     FeedEvent,
     FeedResponse,
@@ -188,6 +189,21 @@ async def step(task_id: str, req: StepRequest, user: str = Depends(senior)) -> S
         family.on_finished(store, task, " ".join(x for x in (res.message, agent_loop.efficiency_note(task)) if x))
     store.put(task)
     return res
+
+
+@app.post("/v1/tasks/{task_id}/instruct")
+def instruct(task_id: str, req: InstructRequest, user: str = Depends(senior)) -> dict[str, str]:
+    """The user said something mid-task ("also add bread", "pay by UPI"): steer the operator."""
+    task = _task(task_id, user)
+    text = req.text.strip()
+    task.instructions.append(text)
+    task.history.append(f'User asked: "{text[:100]}"')
+    task.skill_id = None  # the saved routine no longer matches the changed task
+    task.last_failed = False
+    task.add_log("instruct", text=text)
+    family.record(store, user, "instruction", "routine", f'{family._name(store, user)} asked: "{text[:80]}"', task.goal, task.id)
+    store.put(task)
+    return {"status": "ok"}
 
 
 @app.post("/v1/tasks/{task_id}/stop")

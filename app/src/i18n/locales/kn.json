@@ -133,6 +133,9 @@
   "itemFruit": "ಹಣ್ಣು",
   "checkScam": "ಮೋಸ ಪರಿಶೀಲಿಸಿ",
   "scamChecking": "ಈ ಸಂದೇಶ ಪರಿಶೀಲಿಸುತ್ತಿದ್ದೇನೆ…",
+  "sayChange": "🎤 ಬೇರೆ ಏನಾದರೂ ಹೇಳಿ",
+  "sayChangePrompt": "ಏನು ಬದಲಿಸಬೇಕು ಹೇಳಿ.",
+  "changeHeard": "ಅರ್ಥವಾಯಿತು: “{text}”. ಹಾಗೇ ಮಾಡುತ್ತೇನೆ.",
   "namePrefixes": [
     "ನನ್ನ ಹೆಸರು",
     "ನಾನು",
