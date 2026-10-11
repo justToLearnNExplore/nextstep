@@ -106,13 +106,15 @@ class VoiceIO(private val context: Context) {
     val pcm = record() ?: return Heard(null, "mic_unavailable")
     if (cancelled) return Heard(null, "cancelled")
     if (pcm.peak < MIC_DEAD_PEAK) return Heard(null, "mic_silent")
-    if (!pcm.speech) return Heard(null, "silence")
+    // Even if our simple detector didn't hear speech, let Google decide: phone mics differ a lot.
 
     return try {
       val res = api.post("/v1/stt", JSONObject()
         .put("language", lang)
         .put("sample_rate", RATE)
-        .put("audio_b64", Base64.encodeToString(pcm.bytes, Base64.NO_WRAP)), timeoutMs = 30_000)
+        .put("audio_b64", Base64.encodeToString(pcm.bytes, Base64.NO_WRAP))
+        .put("diag", JSONObject().put("peak", pcm.peak.toInt()).put("floor", pcm.floor.toInt())
+          .put("speech", pcm.speech).put("ms", pcm.ms).put("device", android.os.Build.MODEL)), timeoutMs = 30_000)
       val text = res.optString("text").trim()
       if (text.isEmpty()) Heard(null, "silence") else Heard(text, null)
     } catch (e: BackendError) {
@@ -124,7 +126,7 @@ class VoiceIO(private val context: Context) {
     }
   }
 
-  private class Pcm(val bytes: ByteArray, val peak: Double, val speech: Boolean)
+  private class Pcm(val bytes: ByteArray, val peak: Double, val speech: Boolean, val floor: Double, val ms: Int)
 
   /**
    * Simple voice-activity detection: wait up to [WAIT_FOR_SPEECH_MS] for speech, then stop after
@@ -132,11 +134,14 @@ class VoiceIO(private val context: Context) {
    */
   private fun record(): Pcm? {
     val minBuf = AudioRecord.getMinBufferSize(RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-    val rec = try {
-      AudioRecord(MediaRecorder.AudioSource.VOICE_RECOGNITION, RATE, AudioFormat.CHANNEL_IN_MONO,
-        AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, RATE / 2))
-    } catch (e: SecurityException) { return null }
-    if (rec.state != AudioRecord.STATE_INITIALIZED) { rec.release(); return null }
+    // MIC applies the phone's automatic gain; VOICE_RECOGNITION is raw and very quiet on many
+    // phones (e.g. Motorola), which made speech look like silence.
+    val rec = listOf(MediaRecorder.AudioSource.MIC, MediaRecorder.AudioSource.VOICE_RECOGNITION).firstNotNullOfOrNull { src ->
+      try {
+        AudioRecord(src, RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, maxOf(minBuf, RATE / 2))
+          .takeIf { it.state == AudioRecord.STATE_INITIALIZED } ?: null
+      } catch (e: SecurityException) { null } catch (e: IllegalArgumentException) { null }
+    } ?: return null
 
     val frame = ShortArray(RATE / 10) // 100 ms
     val out = ByteArrayOutputStream()
@@ -157,7 +162,7 @@ class VoiceIO(private val context: Context) {
         elapsed += 100
         // The first 300 ms set the room's noise floor.
         if (elapsed <= 300) { floor = if (floor < 0) rms else (floor + rms) / 2; continue }
-        val threshold = maxOf(floor * 2.5, SPEECH_MIN_RMS)
+        val threshold = maxOf(floor * 2.0, SPEECH_MIN_RMS)
         if (rms > threshold) { speech = true; quiet = 0 } else if (speech) quiet += 100
         if (speech && quiet >= END_SILENCE_MS) break
         if (!speech && elapsed >= WAIT_FOR_SPEECH_MS) break
@@ -167,7 +172,7 @@ class VoiceIO(private val context: Context) {
       rec.release()
     }
     Log.d(TAG, "recorded ${elapsed}ms peak=${peak.toInt()} floor=${floor.toInt()} speech=$speech")
-    return Pcm(out.toByteArray(), peak, speech)
+    return Pcm(out.toByteArray(), peak, speech, floor, elapsed)
   }
 
   fun shutdown() {
@@ -182,7 +187,7 @@ class VoiceIO(private val context: Context) {
     private const val MAX_MS = 12_000
     private const val WAIT_FOR_SPEECH_MS = 7_000
     private const val END_SILENCE_MS = 1_400
-    private const val SPEECH_MIN_RMS = 400.0
+    private const val SPEECH_MIN_RMS = 150.0
     private const val MIC_DEAD_PEAK = 30.0
   }
 }

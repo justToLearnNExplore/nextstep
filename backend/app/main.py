@@ -262,7 +262,9 @@ async def stt(req: SttRequest, user: str = Depends(senior)) -> SttResponse:
     """Transcribes a short voice clip; audio is not stored."""
     if len(req.audio_b64) > 2_000_000:  # ~45 s of 16 kHz audio: far beyond a spoken request
         raise HTTPException(413, "Audio too long")
-    return SttResponse(text=await transcribe(req.audio_b64, req.language, req.sample_rate))
+    text = await transcribe(req.audio_b64, req.language, req.sample_rate)
+    log.info("stt lang=%s chars=%d diag=%s", req.language, len(text), req.diag)
+    return SttResponse(text=text)
 
 
 @app.post("/v1/events")

@@ -321,6 +321,7 @@ class SttRequest(BaseModel):
     language: str = "en-IN"
     audio_b64: str = Field(description="Mono 16-bit little-endian PCM (LINEAR16).")
     sample_rate: int = 16000
+    diag: dict[str, Any] | None = Field(default=None, description="Mic levels from the phone, for troubleshooting.")
 
 
 class SttResponse(BaseModel):
