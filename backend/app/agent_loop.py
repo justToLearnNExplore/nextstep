@@ -18,7 +18,7 @@ from .guardian import ALLOWED_LINK_PREFIXES, classify
 from .i18n import phrase
 from .operator import next_actions
 from .protocol import GatedAction, Screen, StepResponse
-from .rules import interruption_action
+from .rules import interruption_action, needs_screenshot
 from .skills import (
     MIN_MATCH, Skill, SkillStep, fill, generic_steps, learn, multi_item, replay_action, similarity, step_from_action, target_node,
 )
@@ -123,6 +123,8 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     # Old items in the cart: the AI empties it first (never replayed, never learned).
     track_cart(task, screen)
     if task.cart == "clearing":
+        if wants_screenshot(task, screen):
+            return StepResponse(need_screenshot=True)
         res = guard_repeats(task, await next_actions(task, screen, CLEAR_CART_HINT))
         _remember(task, screen, res.actions, learnable=False)
         return res
@@ -150,6 +152,8 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
         hint = nxt.intent or (f"tap '{fill(nxt.label, task.plan.param_map)}'" if nxt.label else nxt.name)
 
     # 4. Gemini (only when nothing cheaper applies).
+    if wants_screenshot(task, screen):
+        return StepResponse(need_screenshot=True)
     res = await next_actions(task, screen, hint)
     res = guard_repeats(task, res)
     _remember(task, screen, res.actions, learnable=True)
@@ -162,6 +166,12 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
             if nxt.name == "type" or (tapped is not None and similarity(fill(nxt.label, task.plan.param_map), tapped.label()) >= MIN_MATCH):
                 task.replay_index += 1
     return res
+
+
+def wants_screenshot(task: TaskRecord, screen: Screen) -> bool:
+    """The AI needs to see this screen, but the phone sent only the element list."""
+    return (not screen.screenshot_b64 and not screen.screenshot_tried
+            and needs_screenshot(screen, task.last_failed, first_step=not task.history))
 
 
 MAX_REPEATS = 2

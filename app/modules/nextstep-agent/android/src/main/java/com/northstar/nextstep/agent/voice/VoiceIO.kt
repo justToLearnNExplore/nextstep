@@ -176,6 +176,7 @@ class VoiceIO(private val context: Context) {
     val out = ByteArrayOutputStream()
     var elapsed = 0; var quiet = 0; var speech = false; var peak = 0.0; var floor = -1.0
     var speechLevel = 0.0 // running average of the voice while speaking
+    var speechMs = 0 // time since speech started
     try {
       rec.startRecording()
       while (!cancelled && elapsed < MAX_MS) {
@@ -200,7 +201,10 @@ class VoiceIO(private val context: Context) {
         if (!speech && rms > threshold) { speech = true; speechLevel = rms; quiet = 0 }
         else if (speech && rms > quietBelow) { speechLevel = speechLevel * 0.8 + rms * 0.2; quiet = 0 }
         else if (speech) quiet += 100
+        if (speech) speechMs += 100
         if (speech && quiet >= END_SILENCE_MS) break
+        // Commands are short; a long "utterance" is background noise (TV, fan) holding the mic open.
+        if (speech && speechMs >= MAX_SPEECH_MS) break
         if (!speech && elapsed >= WAIT_FOR_SPEECH_MS) break
       }
     } finally {
@@ -225,7 +229,8 @@ class VoiceIO(private val context: Context) {
     private const val WAIT_FOR_SPEECH_MS = 7_000
     private const val END_SILENCE_MS = 1_200
     /** Below this share of the speaker's own level counts as a pause. */
-    private const val QUIET_RATIO = 0.3
+    private const val QUIET_RATIO = 0.45
+    private const val MAX_SPEECH_MS = 9_000
     private const val SPEECH_MIN_RMS = 150.0
     private const val MIC_DEAD_PEAK = 30.0
   }

@@ -133,9 +133,16 @@ class AgentRunner(
     repeat(MAX_TURNS) {
       if (stopped.get()) return
       if (changeRequested) takeChange(id)
-      val screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
-      val res = api.post("/v1/tasks/$id/step", JSONObject()
+      // Element list first: most steps (saved routines, rules, clear screens) don't need the
+      // picture, and capturing + uploading it is the slowest part of a step on older phones.
+      var screen = overlay.whileHidden { reader.capture(withScreenshot = false) }
+      var res = api.post("/v1/tasks/$id/step", JSONObject()
         .put("screen", screen.toJson()).put("results", results), timeoutMs = SLOW_CALL_MS)
+      if (res.optBoolean("need_screenshot")) {
+        screen = overlay.whileHidden { reader.capture(withScreenshot = true) }
+        res = api.post("/v1/tasks/$id/step", JSONObject()
+          .put("screen", screen.toJson().put("screenshot_tried", true)).put("results", JSONArray()), timeoutMs = SLOW_CALL_MS)
+      }
       log("step", res)
       res.optString("status_text").takeIf { it.isNotBlank() }?.let {
         overlay.showPanel(it, listOf(changeButton { changeRequested = true }), steps = res.optJSONArray("done_steps").strings())

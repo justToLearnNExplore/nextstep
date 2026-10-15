@@ -48,6 +48,9 @@ class Screen(BaseModel):
     height: int
     nodes: list[UiNode] = Field(default_factory=list)
     screenshot_b64: str | None = None
+    # The phone already tried to capture a screenshot (none means it couldn't, e.g. a secure
+    # screen), so the server must not ask for one again.
+    screenshot_tried: bool = False
     has_secure_field: bool = False
 
     def nodes_at(self, x_norm: int, y_norm: int) -> list[UiNode]:
@@ -215,6 +218,9 @@ class StepResponse(BaseModel):
     message: str = ""
     status_text: str = ""
     done_steps: list[str] = Field(default_factory=list)
+    # The next decision needs to see the screen: resend the same screen with a screenshot (and
+    # no results; they were already received). Most steps don't, which saves capture + upload.
+    need_screenshot: bool = False
 
 
 # ---- screen explanation ------------------------------------------------------------------

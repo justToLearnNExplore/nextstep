@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 import app.main as main
 from app.protocol import StepResponse, TaskPlan
 
-SCREEN = {"package": "com.android.launcher", "width": 1000, "height": 2000, "nodes": []}
+SCREEN = {"package": "com.android.launcher", "width": 1000, "height": 2000, "nodes": [], "screenshot_tried": True}
 
 
 def test_task_flow_requires_consent(monkeypatch):

@@ -5,7 +5,7 @@ import app.main as main
 from app.protocol import Gate, GatedAction, ScamCheckResponse, StepResponse, TaskPlan
 from app.store import MemoryStore
 
-SCREEN = {"package": "com.grofers.customerapp", "width": 1000, "height": 2000, "nodes": []}
+SCREEN = {"package": "com.grofers.customerapp", "width": 1000, "height": 2000, "nodes": [], "screenshot_tried": True}
 SENIOR = {"X-Device-Id": "kamala-phone-01"}
 
 

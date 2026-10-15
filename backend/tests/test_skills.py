@@ -20,19 +20,19 @@ def node(i, label, box, **kw):
 
 def screens(item: str, other: str):
     """Blinkit-like screens: home → search box focused → results with two ADD buttons → cart."""
-    home = {"package": PKG, "width": 1000, "height": 2000, "nodes": [
+    home = {"package": PKG, "width": 1000, "height": 2000, "screenshot_tried": True, "nodes": [
         node(0, "Search for atta, dal and more", (50, 100, 950, 200), click=True),
         node(1, "Delivery in 10 minutes", (50, 220, 950, 300)),
     ]}
-    search = {"package": PKG, "width": 1000, "height": 2000, "nodes": [
+    search = {"package": PKG, "width": 1000, "height": 2000, "screenshot_tried": True, "nodes": [
         node(0, "", (50, 100, 950, 200), edit=True, focus=True),
         node(1, "Recent searches", (50, 220, 950, 300)),
     ]}
-    results = {"package": PKG, "width": 1000, "height": 2000, "nodes": [
+    results = {"package": PKG, "width": 1000, "height": 2000, "screenshot_tried": True, "nodes": [
         node(0, f"Amul {other}", (50, 300, 600, 380)), node(1, "ADD", (700, 300, 950, 380), click=True),
         node(2, f"Amul Taaza {item} 1 L", (50, 600, 600, 680)), node(3, "ADD", (700, 600, 950, 680), click=True),
     ]}
-    cart = {"package": PKG, "width": 1000, "height": 2000, "nodes": [
+    cart = {"package": PKG, "width": 1000, "height": 2000, "screenshot_tried": True, "nodes": [
         node(0, "Cash on Delivery", (50, 1500, 950, 1580), click=True),
         node(1, "Place Order ₹68", (50, 1800, 950, 1950), click=True),
     ]}
@@ -234,3 +234,14 @@ def test_old_blinkit_cart_is_emptied_first(task):
     assert task.cart == "clearing"
     track_cart(task, screen("Your cart is empty"))
     assert task.cart == "clear"
+
+
+def test_ai_step_asks_for_screenshot_only_when_needed(task):
+    import asyncio
+    from app.agent_loop import decide
+    from app.protocol import Screen
+    from app.store import MemoryStore
+    task.history = ["Opened Blinkit"]
+    bare = Screen(package="com.example", width=1000, height=2000, nodes=[])  # nothing readable
+    res = asyncio.run(decide(MemoryStore(), task, bare))
+    assert res.need_screenshot and not res.actions
