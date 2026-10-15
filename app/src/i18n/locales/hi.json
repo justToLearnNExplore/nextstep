@@ -196,5 +196,17 @@
   "keepGoing": "जारी रखें",
   "stop": "रोकें",
   "cancel": "रद्द करें",
-  "lastOrder": "पिछली बार: {items}"
+  "lastOrder": "पिछली बार: {items}",
+  "photoGuide": "कैमरा सामने रखें और फोटो लें दबाएँ।",
+  "photoReady": "आपकी फोटो तैयार है। भेजने के लिए WhatsApp पर भेजें दबाएँ।",
+  "photoTitle": "आपकी फोटो",
+  "noChange": "ठीक है, कोई बदलाव नहीं। आगे बढ़ रहा हूँ।",
+  "noChangeWords": [
+    "कुछ नहीं",
+    "रहने दो",
+    "नहीं",
+    "kuch nahi",
+    "nothing",
+    "no"
+  ]
 }

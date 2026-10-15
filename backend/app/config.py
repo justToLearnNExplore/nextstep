@@ -12,6 +12,10 @@ class Settings:
     # Free-tier deployments override these (see infra/deploy-backend.sh).
     operator_model: str = os.getenv("NEXTSTEP_OPERATOR_MODEL", "gemini-3.8-flash")
     operator_fallbacks: tuple[str, ...] = _list("NEXTSTEP_OPERATOR_FALLBACKS", "gemini-3.5-flash")
+    # Routine steps use plain function calling with the same phone actions: ~2 s per step
+    # instead of ~6.5 s through the Computer Use tool, which handles retries and hard screens.
+    quick_operator_model: str = os.getenv("NEXTSTEP_QUICK_OPERATOR_MODEL", "gemini-3.8-flash")
+    quick_operator_fallbacks: tuple[str, ...] = _list("NEXTSTEP_QUICK_OPERATOR_FALLBACKS", "gemini-3.5-flash")
     reasoning_model: str = os.getenv("NEXTSTEP_REASONING_MODEL", "gemini-3.8-flash")
     reasoning_fallbacks: tuple[str, ...] = _list("NEXTSTEP_REASONING_FALLBACKS", "gemini-3.6-flash,gemini-3.5-flash-lite")
     fast_model: str = os.getenv("NEXTSTEP_FAST_MODEL", "gemini-3.5-flash-lite")

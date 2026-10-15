@@ -132,8 +132,9 @@ class TaskPlan(BaseModel):
         default=None,
         description="Optional https link that jumps straight to the right screen, only from: youtube.com/results?search_query=..., blinkit.com/s/?q=..., m.uber.com/ul/?action=setPickup...",
     )
-    special_flow: Literal["medicine_photo"] | None = Field(
-        default=None, description="'medicine_photo' when the user wants to photograph a medicine/prescription and share it."
+    special_flow: Literal["medicine_photo", "photo_share"] | None = Field(
+        default=None,
+        description="'medicine_photo' to photograph a medicine/prescription; 'photo_share' to take any other photo and share it on WhatsApp.",
     )
     recipient: Literal["doctor", "family"] | None = Field(
         default=None, description="For medicine_photo: who to send it to, if the user said so."

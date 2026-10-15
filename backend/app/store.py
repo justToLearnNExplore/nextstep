@@ -43,6 +43,7 @@ class TaskRecord(BaseModel):
     awaiting_install: str | None = None  # package the user is installing from the Play Store
     last_signature: str = ""  # previous action, to catch the agent repeating itself
     repeats: int = 0
+    cart: str = "unknown"  # shopping apps: "unknown" -> "clearing" (old items found) -> "clear"
     # Cost/efficiency telemetry (shown to judges and in the action log).
     ai_calls: int = 0
     skill_steps: int = 0

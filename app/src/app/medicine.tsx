@@ -30,7 +30,9 @@ const SPEAK_GAP_MS = 2500;
  */
 export default function Medicine() {
   const { t, lang } = useI18n();
-  const { to } = useLocalSearchParams<{ to?: Recipient }>();
+  const { to, mode } = useLocalSearchParams<{ to?: Recipient; mode?: 'photo' }>();
+  /** Any photo to share on WhatsApp: no label guidance or reading, just camera → share. */
+  const plainPhoto = mode === 'photo';
   const { contacts } = useContacts();
   const camera = useRef<MedicineCameraHandle>(null);
 
@@ -61,6 +63,7 @@ export default function Medicine() {
   }, [t]);
 
   const onGuidance = (state: GuidanceState) => {
+    if (plainPhoto) return;
     setGuidance(state);
     const now = Date.now();
     if (state !== lastSpoken.current.key && now - lastSpoken.current.at > SPEAK_GAP_MS) {
@@ -80,6 +83,11 @@ export default function Medicine() {
       return;
     }
     setPhoto(shot);
+    if (plainPhoto) {
+      setPhase('review');
+      say(t('photoReady'));
+      return;
+    }
     setPhase('reading');
     say(t('reading'));
     try {
@@ -110,7 +118,7 @@ export default function Medicine() {
   /** Any WhatsApp chat: WhatsApp's own contact picker opens; NextStep never sends without a yes. */
   const shareOnWhatsApp = () => {
     if (!photo) return;
-    NextStepAgent.shareImageToWhatsApp(photo.path, null, info?.caption || t('captionFallback'), 'WhatsApp');
+    NextStepAgent.shareImageToWhatsApp(photo.path, null, plainPhoto ? '' : info?.caption || t('captionFallback'), 'WhatsApp');
   };
 
   if (error) {
@@ -123,7 +131,7 @@ export default function Medicine() {
   }
 
   if (phase === 'camera' || phase === 'permission') {
-    const ready = guidance === 'ready';
+    const ready = plainPhoto || guidance === 'ready';
     return (
       <View style={styles.full}>
         {phase === 'camera' ? (
@@ -136,7 +144,7 @@ export default function Medicine() {
         ) : null}
         <View style={[styles.banner, { backgroundColor: ready ? colors.go : colors.amber }]} accessibilityLiveRegion="polite">
           <Text style={[styles.bannerText, { color: ready ? colors.white : colors.ink }]}>
-            {t(`guide_${guidance}` as StringKey)}
+            {plainPhoto ? t('photoGuide') : t(`guide_${guidance}` as StringKey)}
           </Text>
         </View>
         <View style={styles.controls}>
@@ -166,9 +174,15 @@ export default function Medicine() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.review}>
-        <Title>{t('medicineTitle')}</Title>
+        <Title>{plainPhoto ? t('photoTitle') : t('medicineTitle')}</Title>
         {photo ? <Image source={{ uri: photo.uri }} style={styles.photo} resizeMode="contain" /> : null}
-        {phase === 'reading' ? (
+        {plainPhoto ? (
+          <>
+            <BigButton label={t('shareOnWhatsApp')} icon="whatsapp" tone="go" tall onPress={shareOnWhatsApp} />
+            <BigButton label={t('retake')} icon="camera-retake" tone="outline" onPress={retake} />
+            <BigButton label={t('back')} icon="arrow-left" tone="outline" onPress={() => router.back()} />
+          </>
+        ) : phase === 'reading' ? (
           <Body>{t('reading')}</Body>
         ) : (
           <>

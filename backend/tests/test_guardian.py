@@ -67,3 +67,22 @@ def test_model_safety_decision_can_only_raise(blinkit_checkout):
 
 def test_no_consent_blocks_everything(blinkit_checkout):
     assert classify("click", {"x": 500, "y": 50}, blinkit_checkout, "en-IN", False).gate == Gate.BLOCKED
+
+
+def _uber(label, extra=()):
+    from app.protocol import Screen, UiNode
+    nodes = [UiNode(i=0, text=label, click=True, b=[100, 900, 900, 1000]), *[UiNode(i=k + 1, text=t, b=[0, 0, 10, 10]) for k, t in enumerate(extra)]]
+    return Screen(package="com.ubercab", width=1000, height=2000, nodes=nodes)
+
+
+def test_uber_cancel_taps_preapproved_by_plan_yes():
+    from app.guardian import classify
+    from app.protocol import Gate
+    a = classify("click", {"x": 500, "y": 475, "intent": "Tapping Cancel ride"}, _uber("Cancel ride"), "en-IN", True, "uber_cancel_ride")
+    assert a.gate == Gate.AUTO
+    # Same tap in any other task still asks.
+    b = classify("click", {"x": 500, "y": 475, "intent": "Tapping Cancel ride"}, _uber("Cancel ride"), "en-IN", True, "uber_book_ride")
+    assert b.gate == Gate.CONFIRM
+    # A cancellation fee always gets a question.
+    c = classify("click", {"x": 500, "y": 475, "intent": "Tapping Cancel ride"}, _uber("Cancel ride", ["Cancellation fee ₹25"]), "en-IN", True, "uber_cancel_ride")
+    assert c.gate == Gate.CONFIRM

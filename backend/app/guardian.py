@@ -50,6 +50,10 @@ ALLOWED_LINK_PREFIXES = (
 
 DIGITS_ONLY = re.compile(r"^\s*\d{4,8}\s*$")
 
+# Tasks whose plan question already was the irreversible yes ("Shall I cancel your Uber ride?"):
+# the app's own cancel buttons and its "are you sure" step then need no second NextStep question.
+PREAPPROVED = {"uber_cancel_ride": re.compile(r"\bcancel\b|\bskip\b|\bdone\b", re.I)}
+
 
 def classify(
     name: str,
@@ -57,6 +61,7 @@ def classify(
     screen: Screen,
     language: str,
     consented: bool,
+    task_kind: str | None = None,
 ) -> GatedAction:
     """Returns the action with gate, reason and the sentence to say to the user."""
     intent = str(args.get("intent", ""))
@@ -99,7 +104,13 @@ def classify(
         elif screen.package in MESSAGE_APPS and _has_unofficial_link(label):
             escalate(Gate.BLOCKED, "unverified_link_in_message", phrase(language, "blocked_link"))
         elif (IRREVERSIBLE.search(label) or IRREVERSIBLE.search(intent)) and not SELECT_ONLY.search(label):
-            escalate(Gate.CONFIRM, f"irreversible:{label[:60] or intent[:60]}")
+            approved = PREAPPROVED.get(task_kind or "")
+            hit = IRREVERSIBLE.search(label) or IRREVERSIBLE.search(intent)
+            fee = any(re.search(r"\bfee\b|charge", n.label(), re.I) for n in screen.nodes)
+            if approved and hit and approved.search(hit.group(0)) and not fee:
+                action.reason = "preapproved_by_plan"
+            else:
+                escalate(Gate.CONFIRM, f"irreversible:{label[:60] or intent[:60]}")
 
     if name == "type":
         focused = next((n for n in screen.nodes if n.focus and n.edit), None)

@@ -125,9 +125,34 @@ def fill(text: str, params: dict[str, str]) -> str:
     return re.sub(r"\{(\w+)\}", lambda m: params.get(m.group(1), m.group(0)), text)
 
 
+def generic_steps(steps: list[SkillStep], params: dict[str, str]) -> list[SkillStep]:
+    """Drops steps tied to one particular order: typing a literal product name, or tapping a button
+    that belongs to a product that isn't a parameter (else "order bread" would re-add last week's
+    toffees). Also applied to stored skills, which cleans recipes learned before this rule."""
+    if not params:
+        return [s for s in steps if s.name in REPLAYABLE]
+    keep = []
+    for s in steps:
+        if s.name not in REPLAYABLE:
+            continue
+        if s.name == "type" and "{" not in s.text:
+            continue
+        if s.name in ("click", "long_press") and s.context and "{" not in s.context:
+            continue
+        keep.append(s)
+    return keep
+
+
+def multi_item(params: dict[str, str]) -> bool:
+    """Orders of several products (item, item2, ...) can't be replayed as one recipe."""
+    return any(re.search(r"\d$", k) for k in params)
+
+
 def learn(uid: str, key: str, params: dict[str, str], trace: list[SkillStep], existing: Skill | None) -> Skill | None:
     """Builds or reinforces a skill from a successful run's trace."""
-    steps = [s for s in trace if s.name in REPLAYABLE]
+    if multi_item(params):
+        return existing
+    steps = generic_steps(trace, params)
     if len(steps) < 2:
         return existing
     if existing and len(existing.steps) <= len(steps) and existing.successes >= 2:
@@ -186,6 +211,8 @@ def replay_action(step: SkillStep, screen: Screen, params: dict[str, str]) -> di
     the screen doesn't match (then the AI handles this step)."""
     if step.package and screen.package and step.package != screen.package and step.name not in ("open_app", "open_link"):
         return None
+    if any(re.search(r"\{\w+\}", fill(t, params)) for t in (step.label, step.context, step.text)):
+        return None  # the recipe needs a detail this task doesn't have (e.g. a second item)
     if step.name in ("click", "long_press"):
         node = find_by_label(screen, fill(step.label, params), fill(step.context, params))
         if node is None:

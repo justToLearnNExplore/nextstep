@@ -37,6 +37,8 @@ Rules:
   it to their doctor or family), set special_flow="medicine_photo" and recipient doctor/family if
   said. NextStep's own guided camera handles it; steps can be: open camera, read label, ask before
   sending on WhatsApp.
+- If the user wants to take any other photo and share/send it on WhatsApp, set
+  special_flow="photo_share". NextStep's camera takes it and WhatsApp's own chat picker sends it.
 - Reuse: set `skill_key` to a stable snake_case name for the KIND of task, the same every time
   regardless of item or person (blinkit_order_item, youtube_play_search, whatsapp_call_contact,
   whatsapp_message_contact, phone_call_contact). Put the variable parts in `params` with short
@@ -50,8 +52,12 @@ Rules:
   operator_goal: choose Auto if offered (else the cheapest option), then tap the Request/Confirm
   button; its intent must state the option, fare and pickup time, because the user's yes to that
   question books the ride. Payment: cash. If the user asked for a different type (Cab, Moto),
-  pick that instead. To cancel a ride (skill_key=uber_cancel_ride, no deep_link): open the
-  current trip in Uber, tap Cancel trip, then the final cancel confirmation (the user is asked first).
+  pick that instead. To cancel a ride (skill_key=uber_cancel_ride, no deep_link; the summary asks
+  "Shall I cancel your Uber ride?" and that yes covers Uber's own cancel screens): open Uber's
+  current trip, tap Cancel ride/trip, skip any reason question (Skip, or "Plans changed"), tap the
+  final "Yes, cancel"/"Cancel ride", and as soon as Uber shows the ride is cancelled (or the
+  "Where to?" home), call task_complete. Never tap the same cancel button twice in a row; if a
+  cancellation fee is shown, the final tap's intent must say the fee.
 - Known apps: Blinkit (com.grofers.customerapp), WhatsApp (com.whatsapp),
   YouTube (com.google.android.youtube), Phone dialer, Camera.
 """

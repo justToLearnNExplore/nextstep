@@ -10,6 +10,7 @@ When a task succeeds, its trace becomes / reinforces a skill for next time.
 """
 
 import logging
+import re
 from typing import Any
 
 from . import family
@@ -18,11 +19,37 @@ from .i18n import phrase
 from .operator import next_actions
 from .protocol import GatedAction, Screen, StepResponse
 from .rules import interruption_action
-from .skills import MIN_MATCH, Skill, SkillStep, fill, learn, replay_action, similarity, step_from_action, target_node
+from .skills import (
+    MIN_MATCH, Skill, SkillStep, fill, generic_steps, learn, multi_item, replay_action, similarity, step_from_action, target_node,
+)
 from .store import Store, TaskRecord
 
 log = logging.getLogger("nextstep")
 LOOKAHEAD = 3  # how far ahead in a recipe we look if the app skipped a screen
+
+BLINKIT = "com.grofers.customerapp"
+CART_BAR = re.compile(r"view cart|\b\d+\s+items?\b", re.I)
+CART_PAGE = re.compile(r"bill details|grand total|to pay\b|delivery instructions", re.I)
+CART_EMPTY = re.compile(r"cart is empty|nothing in (your|the) cart", re.I)
+CLEAR_CART_HINT = (
+    "before ordering, empty the cart left over from earlier: open it (View cart) and tap '−' on every "
+    "item until the cart is empty. Do not order anything yet; then go back to the search"
+)
+
+
+def track_cart(task: TaskRecord, screen: Screen) -> None:
+    """A new Blinkit order starts from an empty cart, so last time's items are never ordered again.
+    Watches the screen: a cart bar before we've added anything means old items to remove first."""
+    ordering = (task.plan.skill_key or "").startswith("blinkit_order")
+    if not ordering or screen.package != BLINKIT or task.cart == "clear" or len(screen.nodes) < 8:
+        return  # other app, done, or still loading
+    text = " | ".join(n.label() for n in screen.nodes)
+    has_cart = bool(CART_BAR.search(text) or CART_PAGE.search(text))
+    if task.cart == "unknown":
+        task.cart = "clearing" if has_cart else "clear"
+    elif CART_EMPTY.search(text) or not has_cart:
+        task.cart = "clear"
+        task.history.append("Emptied the old cart")
 
 
 def _ok(result: dict[str, Any]) -> bool:
@@ -50,7 +77,7 @@ def absorb_results(task: TaskRecord, results: list[dict[str, Any]]) -> None:
 
 
 def _gate(task: TaskRecord, screen: Screen, name: str, args: dict[str, Any], call_id: str) -> GatedAction:
-    a = classify(name, args, screen, task.language, task.consented)
+    a = classify(name, args, screen, task.language, task.consented, task.plan.skill_key)
     a.call_id = call_id
     return a
 
@@ -93,10 +120,18 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
         _remember(task, screen, [act], learnable=False)
         return StepResponse(actions=[act], status_text=act.intent, source="rule")
 
+    # Old items in the cart: the AI empties it first (never replayed, never learned).
+    track_cart(task, screen)
+    if task.cart == "clearing":
+        res = guard_repeats(task, await next_actions(task, screen, CLEAR_CART_HINT))
+        _remember(task, screen, res.actions, learnable=False)
+        return res
+
     # 3. Learned skill.
     hint = None
     skill = store.get_skill(task.skill_id) if task.skill_id else None
     if skill is not None:
+        skill.steps = generic_steps(skill.steps, task.plan.param_map)  # same recipe attach_skill saw
         if task.replay_index >= len(skill.steps):
             return StepResponse(done=True, message="", source="skill")
         for ahead in range(LOOKAHEAD):
@@ -158,8 +193,12 @@ def attach_skill(store: Store, task: TaskRecord) -> Skill | None:
     key = task.plan.skill_key
     if not key:
         return None
+    if multi_item(task.plan.param_map):
+        return None
     skill = store.get_skill(f"{task.user_id}__{key}") or store.get_skill(f"*__{key}")
-    if skill and skill.steps and skill.failures <= skill.successes:
+    if skill:
+        skill.steps = generic_steps(skill.steps, task.plan.param_map)
+    if skill and len(skill.steps) >= 2 and skill.failures <= skill.successes:
         task.skill_id = skill.doc_id
         return skill
     return None

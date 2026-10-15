@@ -1,12 +1,19 @@
-"""Phone operator: Gemini Computer Use in the mobile environment.
+"""Phone operator: Gemini chooses the next phone actions, two ways.
+
+- Quick (default): plain Gemini function calling with the phone's own actions (click, type,
+  scroll, ...). Same model and prompt as below, ~2 s per step.
+- Computer Use (mobile environment): Gemini's dedicated agent tool, ~6.5 s per step. Used when a
+  quick step failed, when the quick path can't answer, and for retries (higher thinking).
 
 Each step is a self-contained call (goal + one-line history + current screen), so the cost of a
 step stays flat instead of growing with every past screenshot. Screenshots are sent only when the
-element list isn't enough, at medium resolution, with low thinking for routine steps. Every
-proposed action goes through the Guardian before it is returned to the phone.
+element list isn't enough. Every proposed action goes through the Guardian before it is returned
+to the phone.
 """
 
+import base64
 import logging
+from types import SimpleNamespace
 from typing import Any
 
 from google import genai
@@ -16,7 +23,7 @@ from .config import settings
 from .guardian import ALLOWED_LINK_PREFIXES, classify
 from .i18n import language, only_language, phrase
 from .protocol import GatedAction, Screen, StepResponse
-from .resilience import first_working
+from .resilience import AIUnavailable, first_working
 from .rules import needs_screenshot
 from .store import TaskRecord
 
@@ -161,6 +168,72 @@ def _image(screen: Screen, resolution: str) -> list[dict[str, Any]]:
     return [{"type": "image", "data": screen.screenshot_b64, "mime_type": "image/jpeg", "resolution": resolution}]
 
 
+def _fn(name: str, description: str, props: dict[str, Any] | None = None, required: list[str] | None = None) -> dict[str, Any]:
+    props = {**(props or {}), "intent": {"type": "string", "description": "What this does, shown and spoken to the user."}}
+    return {"name": name, "description": description,
+            "parameters": {"type": "object", "properties": props, "required": [*(required or []), "intent"]}}
+
+
+_XY = {"x": {"type": "integer", "description": "0-999, from the element list"}, "y": {"type": "integer", "description": "0-999"}}
+
+# The phone's own action names and arguments (ActionExecutor.kt), so both paths drive it the same way.
+QUICK_FUNCTIONS: list[dict[str, Any]] = [
+    _fn("click", "Tap at a point on the screen.", _XY, ["x", "y"]),
+    _fn("long_press", "Press and hold at a point.", _XY, ["x", "y"]),
+    _fn("type", "Type into the focused text field (tap the field first).",
+        {"text": {"type": "string"}, "press_enter": {"type": "boolean"}}, ["text"]),
+    _fn("drag_and_drop", "Swipe/scroll: drag from start to end (e.g. scroll down: start y 750, end y 250).",
+        {k: {"type": "integer"} for k in ("start_x", "start_y", "end_x", "end_y")}, ["start_x", "start_y", "end_x", "end_y"]),
+    _fn("go_back", "Press the phone's Back button."),
+    _fn("open_app", "Open an installed app by name.", {"app_name": {"type": "string"}}, ["app_name"]),
+    _fn("wait", "Wait for the screen to load.", {"seconds": {"type": "integer"}}, ["seconds"]),
+    *[{**f, "parameters": {**f["parameters"], "properties": {**f["parameters"]["properties"],
+        "intent": {"type": "string"}}}} for f in CUSTOM_FUNCTIONS],
+]
+
+
+def _quick_tools() -> list[types.Tool]:
+    decls = [types.FunctionDeclaration(name=f["name"], description=f["description"], parameters_json_schema=f["parameters"])
+             for f in QUICK_FUNCTIONS]
+    return [types.Tool(function_declarations=decls)]
+
+
+async def _quick_steps(task: TaskRecord, screen: Screen, prompt: str, send_image: bool) -> list[Any]:
+    """One quick operator call; returns Computer-Use-shaped steps for to_step_response."""
+    contents: list[Any] = [prompt]
+    if send_image and screen.screenshot_b64:
+        contents.append(types.Part.from_bytes(data=base64.b64decode(screen.screenshot_b64), mime_type="image/jpeg"))
+
+    def create(model: str):
+        return client().aio.models.generate_content(
+            model=model,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM,
+                tools=_quick_tools(),
+                # Always answer with actions (or task_complete), never prose.
+                tool_config=types.ToolConfig(function_calling_config=types.FunctionCallingConfig(mode="ANY")),
+                thinking_config=types.ThinkingConfig(thinking_level="LOW"),
+            ),
+        )
+
+    _, res = await first_working([settings.quick_operator_model, *settings.quick_operator_fallbacks], create, what="operator-quick")
+    task.ai_calls += 1
+    if u := getattr(res, "usage_metadata", None):
+        task.input_tokens += int(u.prompt_token_count or 0)
+        task.output_tokens += int(u.candidates_token_count or 0) + int(u.thoughts_token_count or 0)
+        task.cached_tokens += int(u.cached_content_token_count or 0)
+    calls = res.function_calls or []
+    if not calls and getattr(getattr(res, "prompt_feedback", None), "block_reason", None):
+        raise QuickBlocked()
+    return [SimpleNamespace(type="function_call", name=c.name, arguments=dict(c.args or {}), id=c.id or f"q{task.turns}-{i}")
+            for i, c in enumerate(calls)]
+
+
+class QuickBlocked(Exception):
+    """The quick call's input was blocked by Gemini's safety filter."""
+
+
 def record_usage(task: TaskRecord, interaction: Any) -> None:
     u = getattr(interaction, "usage", None)
     task.ai_calls += 1
@@ -174,8 +247,21 @@ def record_usage(task: TaskRecord, interaction: Any) -> None:
 async def next_actions(task: TaskRecord, screen: Screen, hint: str | None = None) -> StepResponse:
     """One stateless operator turn: constant cost per step (no growing history of screenshots)."""
     send_image = needs_screenshot(screen, task.last_failed, first_step=not task.history)
+    prompt = task_prompt(task, screen, hint)
+    if not task.last_failed:
+        try:
+            steps = await _quick_steps(task, screen, prompt, send_image)
+            if steps:
+                task.turns += 1
+                res = to_step_response(task, screen, steps)
+                res.source = "ai"
+                return res
+        except Exception as e:
+            if isinstance(e, AIUnavailable) and e.kind == "quota":
+                raise
+            log.warning("operator-quick failed (%s); using Computer Use", type(e).__name__)
     model_input = [
-        {"type": "text", "text": task_prompt(task, screen, hint)},
+        {"type": "text", "text": prompt},
         *(_image(screen, "high" if task.last_failed else "medium") if send_image else []),
     ]
 
@@ -238,7 +324,7 @@ def to_step_response(task: TaskRecord, screen: Screen, steps: list[Any]) -> Step
             if step.name == "task_complete":
                 task.status = "done" if args.get("success") else "failed"
                 return StepResponse(done=True, message=str(args.get("message", "")))
-            gated = classify(step.name, args, screen, task.language, task.consented)
+            gated = classify(step.name, args, screen, task.language, task.consented, task.plan.skill_key)
             gated.call_id = step.id
             actions.append(gated)
         elif step.type == "model_output":

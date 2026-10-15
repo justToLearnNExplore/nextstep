@@ -188,5 +188,17 @@
   "keepGoing": "Keep going",
   "stop": "Stop",
   "cancel": "Cancel",
-  "lastOrder": "Last time: {items}"
+  "lastOrder": "Last time: {items}",
+  "photoGuide": "Point the camera and tap Take photo.",
+  "photoReady": "Here is your photo. Tap Share on WhatsApp to send it.",
+  "photoTitle": "Your photo",
+  "noChange": "Okay, no changes. Carrying on.",
+  "noChangeWords": [
+    "nothing",
+    "never mind",
+    "no change",
+    "no",
+    "none",
+    "leave it"
+  ]
 }

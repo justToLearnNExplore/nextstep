@@ -79,11 +79,13 @@ class AgentRunner(
       if (plan.optBoolean("refused")) {
         say(plan.optString("summary"), finalMessage = true); return@execute
       }
-      // Medicine photos use NextStep's own guided camera; sending is confirmed there.
-      if (plan.optString("special_flow") == "medicine_photo") {
+      // Photos use NextStep's own camera (no app-hopping); the user picks the chat and sends there.
+      val flow = plan.optString("special_flow")
+      if (flow == "medicine_photo" || flow == "photo_share") {
         overlay.hidePanel()
         val to = plan.optString("recipient").ifBlank { "doctor" }
-        service.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("nextstep://medicine?to=$to"))
+        val link = if (flow == "photo_share") "nextstep://medicine?mode=photo" else "nextstep://medicine?to=$to"
+        service.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(link))
           .setPackage(service.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP))
         return@execute
       }
@@ -137,6 +139,9 @@ class AgentRunner(
       log("step", res)
       res.optString("status_text").takeIf { it.isNotBlank() }?.let {
         overlay.showPanel(it, listOf(changeButton { changeRequested = true }), steps = res.optJSONArray("done_steps").strings())
+        // Said as it's shown, so voice and text always describe the same step. Questions that
+        // follow (confirm/hand-over) cut this short.
+        if (res.optJSONArray("actions")?.optJSONObject(0)?.optString("gate", "auto") == "auto") voice.speak(it, lang)
       }
       if (res.optBoolean("done")) {
         say(res.optString("message", t("allDone", "All done.")), finalMessage = true)
@@ -458,6 +463,10 @@ class AgentRunner(
     changeRequested = false
     var text = heardChange ?: listenForChange() ?: return null
     heardChange = null
+    if (isNoChange(text)) {
+      say(t("noChange", "Okay, no changes. Carrying on."))
+      return null
+    }
     repeat(3) {
       val ok = ask(t("changeCheck", "You said: “{text}”. Is that right?").replace("{text}", text),
         t("yes", "Yes"), t("tryAgain", "Try again"))
@@ -471,6 +480,14 @@ class AgentRunner(
       text = heardChange?.also { heardChange = null } ?: listenForChange() ?: return null
     }
     return null
+  }
+
+  /** "Nothing", "never mind", "no": the user doesn't want to change anything after all. */
+  private fun isNoChange(text: String): Boolean {
+    val h = text.lowercase().trim().trimEnd('.', '!', '।')
+    val none = prefs.words("noChangeWords", listOf("nothing", "never mind", "no change", "no", "none", "leave it",
+      "kuch nahi", "कुछ नहीं", "रहने दो", "ಏನೂ ಇಲ್ಲ", "ಬೇಡ"))
+    return none.any { h == it || h.startsWith("$it ") } || h.split(Regex("\\s+")).size <= 2 && none.any { h.hasWord(it) }
   }
 
   private fun listenForChange(): String? {

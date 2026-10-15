@@ -203,3 +203,34 @@ def test_waits_allowed_for_slow_apps_but_not_forever():
     for _ in range(5):
         assert not guard_repeats(t, wait()).done
     assert guard_repeats(t, wait()).done  # 6th identical wait: stop
+
+
+def test_recipe_never_replays_another_orders_products():
+    from app.skills import SkillStep, generic_steps, learn, multi_item
+    params = {"item": "ice cream"}
+    steps = [
+        SkillStep(name="click", label="Search", intent="Tapping search"),
+        SkillStep(name="type", text="{item}", intent="Typing {item}"),
+        SkillStep(name="type", text="toffees", intent="Typing toffees"),  # literal: from that one order
+        SkillStep(name="click", label="ADD", context="Cadbury Choclairs Gold Pack", intent="Adding Choclairs"),
+        SkillStep(name="click", label="ADD", context="Amul {item} Cone", intent="Adding {item}"),
+    ]
+    kept = generic_steps(steps, params)
+    assert [s.intent for s in kept] == ["Tapping search", "Typing {item}", "Adding {item}"]
+    assert multi_item({"item": "biscuits", "item2": "ice cream"})
+    assert learn("u", "blinkit_order_item", {"item": "a", "item2": "b"}, steps, None) is None
+
+
+def test_old_blinkit_cart_is_emptied_first(task):
+    from app.agent_loop import track_cart
+    from app.protocol import Screen, UiNode
+    task.plan.skill_key = "blinkit_order_item"
+    def screen(*labels):
+        return Screen(package="com.grofers.customerapp", width=1000, height=2000,
+                      nodes=[UiNode(i=i, text=t, b=[0, i * 10, 100, i * 10 + 9]) for i, t in enumerate([*labels, *[f"x{k}" for k in range(8)]])])
+    track_cart(task, screen("Amul milk", "2 items ₹120", "View cart"))
+    assert task.cart == "clearing"
+    track_cart(task, screen("Bill details", "Choclairs", "−"))
+    assert task.cart == "clearing"
+    track_cart(task, screen("Your cart is empty"))
+    assert task.cart == "clear"
