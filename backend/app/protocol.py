@@ -209,6 +209,7 @@ class GatedAction(BaseModel):
     reason: str = ""
     ask: str = Field(default="", description="What to say to the user when gate is confirm/private/blocked.")
     yes_label: str = ""
+    announce: bool = False  # worth saying aloud (item added, fare found); routine steps stay silent
 
 
 class StepResponse(BaseModel):

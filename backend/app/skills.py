@@ -30,6 +30,7 @@ class SkillStep(BaseModel):
     text: str = ""  # typed text; may contain {param} placeholders
     args: dict[str, Any] = Field(default_factory=dict)  # non-positional args (key, app_name, url)
     intent: str = ""
+    announce: bool = False  # said aloud when replayed (item added), like the original step
 
 
 class Skill(BaseModel):

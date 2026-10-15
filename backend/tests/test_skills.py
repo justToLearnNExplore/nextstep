@@ -245,3 +245,21 @@ def test_ai_step_asks_for_screenshot_only_when_needed(task):
     bare = Screen(package="com.example", width=1000, height=2000, nodes=[])  # nothing readable
     res = asyncio.run(decide(MemoryStore(), task, bare))
     assert res.need_screenshot and not res.actions
+
+
+def test_emptied_cart_folds_history_and_returns_to_search(task):
+    from app.agent_loop import track_cart
+    from app.protocol import Screen, UiNode
+    task.plan.skill_key = "blinkit_order_item"
+    task.history = ["Opening Blinkit"]
+    def screen(*labels):
+        return Screen(package="com.grofers.customerapp", width=1000, height=2000,
+                      nodes=[UiNode(i=i, text=t, b=[0, i * 10, 100, i * 10 + 9]) for i, t in enumerate([*labels, *[f"x{k}" for k in range(8)]])])
+    track_cart(task, screen("Pack of 2 items", "Amul milk"))  # a product name, not the cart bar
+    assert task.cart == "clear"
+    task.cart, task.history = "unknown", ["Opening Blinkit"]
+    track_cart(task, screen("View cart", "₹120"))
+    task.history += ["Removing curd", "Removing oil", "Removing milk"]
+    track_cart(task, screen("Your cart is empty"))
+    assert task.cart == "clear" and task.reopen_search
+    assert len(task.history) == 2 and task.history[1].startswith("Emptied the old cart")

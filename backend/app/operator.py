@@ -104,10 +104,13 @@ Efficiency:
 - You may return up to 3 actions in one turn when they are safe and certain (e.g. tap the search
   box, type, press enter). Never batch past an irreversible step.
 - Use open_link to jump to search results when an allowed link fits the goal.
-- Every `intent` is shown and spoken to the user: say the exact action in a few words, present
-  tense, with what matters, e.g. "Tapping Auto, 86 rupees, 4 minutes away", "Typing milk in
-  search", "Adding 1 litre Amul milk to cart". Don't say "I am going to open the app" or repeat
-  what the user can already see; never explain your reasoning there.
+- Every `intent` is shown to the user: say the exact action in a few words, present tense, with
+  what matters, e.g. "Tapping Auto, 86 rupees, 4 minutes away", "Adding 1 litre Amul milk to
+  cart". Don't say "I am going to open the app"; never explain your reasoning there.
+- Set `announce` true only when the step is worth saying aloud: an item added to the cart, a fare
+  or total found, a message ready. Taps on menus, scrolling, waiting and loading stay silent.
+- Shopping: every item in "Steps done so far" that was added is already in the cart, even if the
+  cart screen doesn't show it (scroll the cart to check). Never add the same item twice.
 
 Safety rules (never break these):
 - Never type, read aloud or guess passwords, PINs, OTPs, UPI PINs, card numbers or bank
@@ -129,7 +132,7 @@ Safety rules (never break these):
 
 def task_prompt(task: TaskRecord, screen: Screen, hint: str | None) -> str:
     lang = language(task.language)
-    done = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(task.history[-15:])) or "(nothing yet)"
+    done = "\n".join(f"{i + 1}. {h}" for i, h in enumerate(task.history[-30:])) or "(nothing yet)"
     parts = [
         f"Goal: {task.plan.operator_goal}",
         f"Write every `intent` and user message in {lang.name}, short and simple. {only_language(task.language)}",
@@ -169,7 +172,8 @@ def _image(screen: Screen, resolution: str) -> list[dict[str, Any]]:
 
 
 def _fn(name: str, description: str, props: dict[str, Any] | None = None, required: list[str] | None = None) -> dict[str, Any]:
-    props = {**(props or {}), "intent": {"type": "string", "description": "What this does, shown and spoken to the user."}}
+    props = {**(props or {}), "intent": {"type": "string", "description": "What this does, shown to the user."},
+             "announce": {"type": "boolean", "description": "Say the intent aloud (key moments only)."}}
     return {"name": name, "description": description,
             "parameters": {"type": "object", "properties": props, "required": [*(required or []), "intent"]}}
 
@@ -188,7 +192,7 @@ QUICK_FUNCTIONS: list[dict[str, Any]] = [
     _fn("open_app", "Open an installed app by name.", {"app_name": {"type": "string"}}, ["app_name"]),
     _fn("wait", "Wait for the screen to load.", {"seconds": {"type": "integer"}}, ["seconds"]),
     *[{**f, "parameters": {**f["parameters"], "properties": {**f["parameters"]["properties"],
-        "intent": {"type": "string"}}}} for f in CUSTOM_FUNCTIONS],
+        "intent": {"type": "string"}, "announce": {"type": "boolean"}}}} for f in CUSTOM_FUNCTIONS],
 ]
 
 
@@ -244,10 +248,12 @@ def record_usage(task: TaskRecord, interaction: Any) -> None:
     task.cached_tokens += int(getattr(u, "total_cached_tokens", 0) or 0)
 
 
-async def next_actions(task: TaskRecord, screen: Screen, hint: str | None = None) -> StepResponse:
+async def next_actions(task: TaskRecord, screen: Screen, hint: str | None = None, max_actions: int = 3) -> StepResponse:
     """One stateless operator turn: constant cost per step (no growing history of screenshots)."""
     send_image = needs_screenshot(screen, task.last_failed, first_step=not task.history)
     prompt = task_prompt(task, screen, hint)
+    if max_actions > 3:
+        prompt += f"\n\nThis turn you may return up to {max_actions} actions."
     if not task.last_failed:
         try:
             steps = await _quick_steps(task, screen, prompt, send_image)
@@ -324,7 +330,9 @@ def to_step_response(task: TaskRecord, screen: Screen, steps: list[Any]) -> Step
             if step.name == "task_complete":
                 task.status = "done" if args.get("success") else "failed"
                 return StepResponse(done=True, message=str(args.get("message", "")))
+            announce = bool(args.pop("announce", False))
             gated = classify(step.name, args, screen, task.language, task.consented, task.plan.skill_key)
+            gated.announce = announce
             gated.call_id = step.id
             actions.append(gated)
         elif step.type == "model_output":

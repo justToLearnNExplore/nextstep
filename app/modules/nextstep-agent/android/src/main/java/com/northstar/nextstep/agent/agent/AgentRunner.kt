@@ -146,9 +146,10 @@ class AgentRunner(
       log("step", res)
       res.optString("status_text").takeIf { it.isNotBlank() }?.let {
         overlay.showPanel(it, listOf(changeButton { changeRequested = true }), steps = res.optJSONArray("done_steps").strings())
-        // Said as it's shown, so voice and text always describe the same step. Questions that
-        // follow (confirm/hand-over) cut this short.
-        if (res.optJSONArray("actions")?.optJSONObject(0)?.optString("gate", "auto") == "auto") voice.speak(it, lang)
+        // Only key moments are said aloud (item added, fare found), as they're shown; routine
+        // taps and scrolls stay silent. Questions that follow (confirm/hand-over) speak for themselves.
+        val first = res.optJSONArray("actions")?.optJSONObject(0)
+        if (first?.optBoolean("announce") == true && first.optString("gate", "auto") == "auto") voice.speak(it, lang)
       }
       if (res.optBoolean("done")) {
         say(res.optString("message", t("allDone", "All done.")), finalMessage = true)
@@ -164,6 +165,7 @@ class AgentRunner(
           .put("result", result))
         if (result.optString("error") in setOf("user_declined", "user_changed_plan") && a.optString("gate") != "auto") break
         if (changeRequested) break
+        if (i < actions.length() - 1) Thread.sleep(BATCH_GAP_MS) // let the app update between batched taps
       }
     }
     say(t("tooLong", "This is taking too long, so I stopped. Nothing was ordered or sent."), finalMessage = true)
@@ -357,7 +359,7 @@ class AgentRunner(
           (n.viewIdResourceName == "$pkg:id/send" || n.contentDescription?.toString().equals("Send", true))
       }
       if (jid == null || executor.waitForNode(10_000, isSend) == null) {
-        say(t("pickChatYourself", "Please choose the chat and tap Send yourself."), finalMessage = true)
+        say(t("pickChatYourself", "Choose the chat and tap Send."), finalMessage = true)
         return@execute
       }
       if (stopped.get()) return@execute
@@ -374,7 +376,7 @@ class AgentRunner(
       }
       log("share_sent", JSONObject().put("recipient", recipient).put("ok", sent))
       if (sent) api.postQuietly("/v1/events", JSONObject().put("kind", "share_sent").put("data", JSONObject().put("recipient", recipient)))
-      say(if (sent) t("photoSent", "Sent.") else t("pickChatYourself", "Please tap Send yourself."), finalMessage = true)
+      say(if (sent) t("photoSent", "Sent.") else t("pickChatYourself", "Choose the chat and tap Send."), finalMessage = true)
     } catch (e: Exception) {
       Log.e(TAG, "share failed", e)
       log("error", JSONObject().put("message", e.message))
@@ -548,6 +550,7 @@ class AgentRunner(
 
   companion object {
     const val MAX_TURNS = 40
+    private const val BATCH_GAP_MS = 400L
     private const val TAG = "NextStepAgent"
     /** Planning and operator steps; the server answers within its 75 s budget. */
     private const val SLOW_CALL_MS = 90_000

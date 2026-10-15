@@ -28,6 +28,7 @@ _EN = {
     "waiting_install": "Please tap Install. I'll continue as soon as it's installed.",
     "scam_safe": "I don't see signs of a scam here. Still, never share your OTP, PIN or password with anyone.",
     "opening_app": "Opening {app}",
+    "searching": "Searching for {item}",
     "ai_blocked": "I can't read this screen safely. Please do this step yourself, then tap Continue.",
 }
 
@@ -48,6 +49,7 @@ LANGUAGES: dict[str, Language] = {
             "waiting_install": "कृपया Install दबाइए। इंस्टॉल होते ही मैं आगे बढ़ूँगा।",
             "scam_safe": "मुझे यहाँ धोखे के संकेत नहीं दिखते। फिर भी अपना ओटीपी, पिन या पासवर्ड किसी को न बताएँ।",
             "opening_app": "{app} खोल रहा हूँ",
+            "searching": "{item} खोज रहा हूँ",
             "ai_blocked": "मैं यह स्क्रीन ठीक से नहीं पढ़ पा रहा। कृपया यह कदम ख़ुद करें, फिर आगे बढ़ें दबाएँ।",
         },
     ),
@@ -66,6 +68,7 @@ LANGUAGES: dict[str, Language] = {
             "waiting_install": "ದಯವಿಟ್ಟು Install ಒತ್ತಿ. ಇನ್‌ಸ್ಟಾಲ್ ಆದ ತಕ್ಷಣ ನಾನು ಮುಂದುವರಿಸುತ್ತೇನೆ.",
             "scam_safe": "ಇಲ್ಲಿ ಮೋಸದ ಲಕ್ಷಣಗಳು ಕಾಣುತ್ತಿಲ್ಲ. ಆದರೂ ನಿಮ್ಮ ಒಟಿಪಿ, ಪಿನ್ ಅಥವಾ ಪಾಸ್‌ವರ್ಡ್ ಯಾರಿಗೂ ಹೇಳಬೇಡಿ.",
             "opening_app": "{app} ತೆರೆಯುತ್ತಿದ್ದೇನೆ",
+            "searching": "{item} ಹುಡುಕುತ್ತಿದ್ದೇನೆ",
             "ai_blocked": "ಈ ಪರದೆಯನ್ನು ಸರಿಯಾಗಿ ಓದಲು ಆಗುತ್ತಿಲ್ಲ. ದಯವಿಟ್ಟು ಈ ಹಂತವನ್ನು ನೀವೇ ಮಾಡಿ, ನಂತರ ಮುಂದುವರಿಸಿ ಒತ್ತಿ.",
         },
     ),

@@ -28,12 +28,16 @@ log = logging.getLogger("nextstep")
 LOOKAHEAD = 3  # how far ahead in a recipe we look if the app skipped a screen
 
 BLINKIT = "com.grofers.customerapp"
-CART_BAR = re.compile(r"view cart|\b\d+\s+items?\b", re.I)
+# Only the cart button itself: "N items" also appears in product names ("Pack of 2 items").
+CART_BAR = re.compile(r"\bview cart\b", re.I)
 CART_PAGE = re.compile(r"bill details|grand total|to pay\b|delivery instructions", re.I)
 CART_EMPTY = re.compile(r"cart is empty|nothing in (your|the) cart", re.I)
+MAX_CLEAR_TURNS = 8
 CLEAR_CART_HINT = (
-    "before ordering, empty the cart left over from earlier: open it (View cart) and tap '−' on every "
-    "item until the cart is empty. Do not order anything yet; then go back to the search"
+    "before ordering, empty the cart left over from earlier. Open it (View cart). Then, in this turn, "
+    "tap the '−' of only the FIRST item, as many times as its quantity (it stays in place until the "
+    "item disappears). Other items move up after that, so leave them for the next turn. Do not add "
+    "or order anything and do not leave the cart; NextStep returns to the search once it is empty"
 )
 
 
@@ -47,9 +51,13 @@ def track_cart(task: TaskRecord, screen: Screen) -> None:
     has_cart = bool(CART_BAR.search(text) or CART_PAGE.search(text))
     if task.cart == "unknown":
         task.cart = "clearing" if has_cart else "clear"
-    elif CART_EMPTY.search(text) or not has_cart:
+        task.cart_from = len(task.history)
+    elif CART_EMPTY.search(text) or not has_cart or task.cart_turns >= MAX_CLEAR_TURNS:
         task.cart = "clear"
-        task.history.append("Emptied the old cart")
+        # One line instead of a dozen "Removing ..." steps, so the operator's memory of this task
+        # keeps what it actually added.
+        task.history[task.cart_from:] = ["Emptied the old cart. Now search for and add each item the user asked for"]
+        task.reopen_search = True
 
 
 def _ok(result: dict[str, Any]) -> bool:
@@ -85,6 +93,8 @@ def _gate(task: TaskRecord, screen: Screen, name: str, args: dict[str, Any], cal
 def _remember(task: TaskRecord, screen: Screen, actions: list[GatedAction], learnable: bool) -> None:
     for a in actions:
         step = step_from_action(a.name, {**a.args, "intent": a.intent}, a.intent, screen, task.plan.param_map) if learnable else None
+        if step:
+            step.announce = a.announce
         task.pending[a.call_id] = {
             "name": a.name, "intent": a.intent, "gate": a.gate.value, "package": a.args.get("package"),
             "learn": step is not None, "step": step.model_dump() if step else None,
@@ -125,9 +135,21 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     if task.cart == "clearing":
         if wants_screenshot(task, screen):
             return StepResponse(need_screenshot=True)
-        res = guard_repeats(task, await next_actions(task, screen, CLEAR_CART_HINT))
+        task.cart_turns += 1
+        # No repeat guard here: the next item's '−' sits where the last one was. MAX_CLEAR_TURNS caps it.
+        res = await next_actions(task, screen, CLEAR_CART_HINT, max_actions=8)
         _remember(task, screen, res.actions, learnable=False)
         return res
+    if task.reopen_search:
+        # Back to the search for the first item: deterministic, no AI call.
+        task.reopen_search = False
+        if link.startswith(ALLOWED_LINK_PREFIXES):
+            task.rule_steps += 1
+            item = task.plan.param_map.get("item") or task.plan.param_map.get("items") or task.plan.target_app or ""
+            act = _gate(task, screen, "open_link", {"url": link, "intent": phrase(task.language, "searching", item=item)}, f"search-{n}")
+            act.announce = True
+            _remember(task, screen, [act], learnable=False)
+            return StepResponse(actions=[act], status_text=act.intent, source="rule")
 
     # 3. Learned skill.
     hint = None
@@ -146,6 +168,7 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
                 task.replay_index = idx + 1
                 task.skill_steps += 1
                 act = _gate(task, screen, step.name, args, f"skill-{n}")
+                act.announce = step.announce
                 _remember(task, screen, [act], learnable=True)
                 return StepResponse(actions=[act], status_text=act.intent, source="skill")
         nxt = skill.steps[task.replay_index]

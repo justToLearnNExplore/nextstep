@@ -113,12 +113,17 @@ export default function Medicine() {
     const c = contacts.doctor;
     if (!photo || !c) return;
     NextStepAgent.shareImageToWhatsApp(photo.path, c.phone, info?.caption || t('captionFallback'), c.name);
+    goHome();
   };
+
+  /** The photo now lives in WhatsApp; reopening NextStep later should start at home. */
+  const goHome = () => router.dismissTo('/talk');
 
   /** Any WhatsApp chat: WhatsApp's own contact picker opens; NextStep never sends without a yes. */
   const shareOnWhatsApp = () => {
     if (!photo) return;
     NextStepAgent.shareImageToWhatsApp(photo.path, null, plainPhoto ? '' : info?.caption || t('captionFallback'), 'WhatsApp');
+    goHome();
   };
 
   if (error) {

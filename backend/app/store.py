@@ -44,6 +44,9 @@ class TaskRecord(BaseModel):
     last_signature: str = ""  # previous action, to catch the agent repeating itself
     repeats: int = 0
     cart: str = "unknown"  # shopping apps: "unknown" -> "clearing" (old items found) -> "clear"
+    cart_from: int = 0  # history length when clearing began (those steps fold into one line)
+    cart_turns: int = 0  # AI turns spent clearing; capped so it can never get stuck there
+    reopen_search: bool = False  # cart just emptied: go back to the item search next
     # Cost/efficiency telemetry (shown to judges and in the action log).
     ai_calls: int = 0
     skill_steps: int = 0
