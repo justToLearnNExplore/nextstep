@@ -97,7 +97,7 @@ def run_task(client, monkeypatch, item, other, ai):
     return start, gates, task
 
 
-def test_first_run_learns_then_repeat_runs_with_zero_ai_calls(monkeypatch):
+def test_first_run_learns_then_repeat_runs_with_one_check_call(monkeypatch):
     client = TestClient(main.app)
     ai = FakeGemini()
 
@@ -111,11 +111,12 @@ def test_first_run_learns_then_repeat_runs_with_zero_ai_calls(monkeypatch):
     assert skill.steps[1].text == "{item}"  # parameterised: works for any item
     assert skill.steps[2].label == "ADD" and "{item}" in skill.steps[2].context
 
-    # Repeat with a different item: replayed from the recipe, no AI at all.
+    # Repeat with a different item: replayed from the recipe; the AI is only asked once, at the
+    # end, to confirm on the live screen that the order really is done.
     ai2 = FakeGemini()
     start, gates, task = run_task(client, monkeypatch, "bread", "Milk", ai2)
     assert start["uses_saved_routine"]
-    assert ai2.calls == 0 and task.ai_calls == 0 and task.skill_steps == 4
+    assert ai2.calls == 1 and task.ai_calls == 1 and task.skill_steps == 4
     sources = [g[0] for g in gates]
     assert sources == ["skill", "skill", "skill", "skill"]
     assert gates[1][3]["text"] == "bread"

@@ -156,8 +156,12 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     skill = store.get_skill(task.skill_id) if task.skill_id else None
     if skill is not None:
         skill.steps = generic_steps(skill.steps, task.plan.param_map)  # same recipe attach_skill saw
-        if task.replay_index >= len(skill.steps):
-            return StepResponse(done=True, message="", source="skill")
+    if skill is not None and task.replay_index >= len(skill.steps):
+        # Routine replayed: the AI confirms on the live screen that the goal is really done
+        # (one quick call), instead of declaring success blindly.
+        task.skill_id, skill = None, None
+        hint = "the saved routine has finished; if the screen shows the goal achieved, call task_complete, otherwise do what's left"
+    if skill is not None:
         for ahead in range(LOOKAHEAD):
             idx = task.replay_index + ahead
             if idx >= len(skill.steps):
@@ -191,10 +195,15 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     return res
 
 
+# Screens where key buttons are icons without text (Uber's ⋮ trip menu): always send the picture.
+VISUAL_TASKS = {"uber_cancel_ride", "uber_book_ride"}
+
+
 def wants_screenshot(task: TaskRecord, screen: Screen) -> bool:
     """The AI needs to see this screen, but the phone sent only the element list."""
-    return (not screen.screenshot_b64 and not screen.screenshot_tried
-            and needs_screenshot(screen, task.last_failed, first_step=not task.history))
+    if screen.screenshot_b64 or screen.screenshot_tried:
+        return False
+    return task.plan.skill_key in VISUAL_TASKS or needs_screenshot(screen, task.last_failed, first_step=not task.history)
 
 
 MAX_REPEATS = 2
@@ -252,14 +261,14 @@ def finish(store: Store, task: TaskRecord, success: bool) -> None:
             store.put_skill(existing)
     log.info(
         "task_finished success=%s skill=%s ai_calls=%d skill_steps=%d rule_steps=%d tokens_in=%d cached=%d tokens_out=%d",
-        success, bool(task.skill_id), task.ai_calls, task.skill_steps, task.rule_steps,
+        success, task.skill_steps > 0, task.ai_calls, task.skill_steps, task.rule_steps,
         task.input_tokens, task.cached_tokens, task.output_tokens,
     )
 
 
 def efficiency_note(task: TaskRecord) -> str:
     total = task.ai_calls + task.skill_steps + task.rule_steps
-    if task.skill_id:
+    if task.skill_steps:
         return f"Used a saved routine: {task.skill_steps} of {total} steps without AI ({task.ai_calls} AI calls)."
     return f"{task.ai_calls} AI calls, {task.rule_steps} free steps."
 

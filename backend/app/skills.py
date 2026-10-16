@@ -141,7 +141,8 @@ def generic_steps(steps: list[SkillStep], params: dict[str, str]) -> list[SkillS
         if s.name in ("click", "long_press") and s.context and "{" not in s.context:
             continue
         keep.append(s)
-    return keep
+    # Only waits and back presses left: nothing worth replaying (it would "finish" doing nothing).
+    return keep if any(s.name in ("click", "long_press", "type") for s in keep) else []
 
 
 def multi_item(params: dict[str, str]) -> bool:

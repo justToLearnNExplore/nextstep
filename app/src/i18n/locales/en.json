@@ -29,7 +29,7 @@
   "showBubble": "Show the NextStep button",
   "bubbleA11y": "NextStep. Tap for help.",
   "understand": "Explain my screen",
-  "close": "Close NextStep",
+  "close": "Close",
   "back": "Back",
   "working": "I'm working on it.",
   "thinking": "Let me think about that…",
@@ -83,7 +83,6 @@
   "sayName": "Say your name",
   "didIHear": "Did I hear your name right?",
   "yesRight": "Yes, that's right",
-  "tryAgain": "Try again",
   "typeInstead": "Type it instead",
   "settingUp": "Setting things up…",
   "greeting": "Namaste, {name}! I'm here to help.",
@@ -102,7 +101,6 @@
   "aiQuota": "My thinking service has reached today's limit. Please try again later. Nothing was ordered or sent.",
   "micSilent": "I can't hear the microphone at all. Please check that it is switched on.",
   "micUnavailable": "The microphone is not available. Please allow NextStep to use it in Settings.",
-  "savedRoutine": "I've done this before, so it will be quick.",
   "waitingInstall": "Please tap Install. I'll continue as soon as it's installed.",
   "whatToOrder": "What would you like to order?",
   "goalOrderItem": "Order {item} on Blinkit with cash on delivery",
@@ -110,8 +108,6 @@
   "scamChecking": "Checking this message…",
   "sayChange": "Add or change something",
   "sayChangePrompt": "What would you like to add or change?",
-  "changeHeard": "Got it: “{text}”. I'll do that.",
-  "changeConfirm": "Got it: “{text}”. Shall I go ahead?",
   "greetingNamed": "Namaste {name}. How can I help today?",
   "greetingPlain": "Namaste. How can I help today?",
   "tapAndSpeak": "Tap and speak",
@@ -119,7 +115,6 @@
   "homeMedicine": "Medicine help",
   "homeRide": "Book a ride",
   "homePhone": "Phone help",
-  "repeatLastOrder": "Repeat last order",
   "photoOfList": "Take photo of list",
   "pointAtList": "Point the camera at your grocery list.",
   "readingList": "Reading your list…",
@@ -148,7 +143,6 @@
   "tellMePrompt": "What should I do here?",
   "openNextStep": "Open NextStep",
   "hideBubble": "Hide",
-  "changeCheck": "You said: “{text}”. Is that right?",
   "namePrefixes": [
     "my name is",
     "my name's",
@@ -188,7 +182,6 @@
   "keepGoing": "Keep going",
   "stop": "Stop",
   "cancel": "Cancel",
-  "lastOrder": "Last time: {items}",
   "photoGuide": "Point the camera and tap Take photo.",
   "photoReady": "Here is your photo. Tap Share on WhatsApp to send it.",
   "photoTitle": "Your photo",
@@ -200,5 +193,8 @@
     "no",
     "none",
     "leave it"
-  ]
+  ],
+  "changeConfirmPlain": "Okay, I've added that. Shall I go ahead?",
+  "changeAdded": "Okay, I'll do that.",
+  "tryAgain": "Try again"
 }

@@ -53,11 +53,13 @@ Rules:
   button; its intent must state the option, fare and pickup time, because the user's yes to that
   question books the ride. Payment: cash. If the user asked for a different type (Cab, Moto),
   pick that instead. To cancel a ride (skill_key=uber_cancel_ride, no deep_link; the summary asks
-  "Shall I cancel your Uber ride?" and that yes covers Uber's own cancel screens): open Uber's
-  current trip, tap Cancel ride/trip, skip any reason question (Skip, or "Plans changed"), tap the
-  final "Yes, cancel"/"Cancel ride", and as soon as Uber shows the ride is cancelled (or the
-  "Where to?" home), call task_complete. Never tap the same cancel button twice in a row; if a
-  cancellation fee is shown, the final tap's intent must say the fee.
+  "Shall I cancel your Uber ride?" and that yes covers Uber's own cancel screens): in Uber's trip
+  screen (the map with the trip sheet at the bottom), tap the three dots (⋮ / More options) at the
+  top right of the trip sheet, or a "Cancel"/"Cancel ride" button if one is already shown; don't
+  scroll the map. Then tap "Cancel ride/trip", skip any reason question (Skip, or "Plans changed"),
+  tap the final "Yes, cancel"/"Cancel ride", and as soon as Uber shows the ride is cancelled (or
+  the "Where to?" home), call task_complete. If a cancellation fee is shown, the final tap's
+  intent must say the fee.
 - Known apps: Blinkit (com.grofers.customerapp), WhatsApp (com.whatsapp),
   YouTube (com.google.android.youtube), Phone dialer, Camera.
 """

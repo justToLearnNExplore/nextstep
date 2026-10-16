@@ -119,6 +119,8 @@ Safety rules (never break these):
 - Before the final irreversible tap (Place order, Pay, Send, Install, Confirm), make sure the
   `intent` states exactly what will happen: items, quantity, total price, payment method, or
   recipient and attachment. Prefer cash on delivery. Never add or change an address silently.
+- If cash on delivery isn't available, don't give up: call hand_over_to_user saying so and asking
+  the user to choose how to pay and finish the payment themselves (the items stay in the cart).
 - Call task_complete(success=true) ONLY when the current screen itself shows the goal achieved
   (e.g. the video player with a pause control, an order-placed confirmation, a sent message).
   A list of search results is not done yet.
@@ -250,7 +252,7 @@ def record_usage(task: TaskRecord, interaction: Any) -> None:
 
 async def next_actions(task: TaskRecord, screen: Screen, hint: str | None = None, max_actions: int = 3) -> StepResponse:
     """One stateless operator turn: constant cost per step (no growing history of screenshots)."""
-    send_image = needs_screenshot(screen, task.last_failed, first_step=not task.history)
+    send_image = bool(screen.screenshot_b64) or needs_screenshot(screen, task.last_failed, first_step=not task.history)
     prompt = task_prompt(task, screen, hint)
     if max_actions > 3:
         prompt += f"\n\nThis turn you may return up to {max_actions} actions."

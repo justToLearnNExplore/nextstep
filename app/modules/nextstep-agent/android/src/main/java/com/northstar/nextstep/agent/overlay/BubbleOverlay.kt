@@ -279,10 +279,13 @@ class BubbleOverlay(
 
   // ---- task panel ------------------------------------------------------------------------
 
-  /** Bottom panel used for plans, confirmations, private-step hand-offs, explanations and scam warnings. */
+  /**
+   * Bottom panel used for plans, confirmations, private-step hand-offs, explanations and scam
+   * warnings. Every panel has a ✕: it runs [onClose] (a question counts it as "No"), or just hides.
+   */
   fun showPanel(
     message: String, buttons: List<PanelButton>, tone: Style? = null, steps: List<String> = emptyList(),
-    autoHideMs: Long? = null,
+    autoHideMs: Long? = null, onClose: (() -> Unit)? = null,
   ) =
     main.post {
       closePopupNow()
@@ -290,11 +293,24 @@ class BubbleOverlay(
       val token = ++panelToken
       panelShownAt = SystemClock.uptimeMillis()
       val card = card(fill = if (tone == Style.STOP) Palette.AMBER else Palette.PAPER).apply {
-        addView(TextView(service).apply {
-          text = message
-          setTextColor(Palette.INK)
-          setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-          setLineSpacing(0f, 1.15f)
+        addView(LinearLayout(service).apply {
+          orientation = LinearLayout.HORIZONTAL
+          addView(TextView(service).apply {
+            text = message
+            setTextColor(Palette.INK)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+            setLineSpacing(0f, 1.15f)
+          }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+          addView(ImageView(service).apply {
+            setImageResource(R.drawable.ic_ns_close)
+            setColorFilter(Palette.INK)
+            contentDescription = t("close", "Close")
+            val p = dp(10); setPadding(p, p, p, p)
+            setOnClickListener {
+              if (SystemClock.uptimeMillis() - panelShownAt < TAP_GUARD_MS) return@setOnClickListener
+              if (onClose != null) onClose() else hidePanel()
+            }
+          }, LinearLayout.LayoutParams(dp(48), dp(48)).apply { marginStart = dp(8) })
         })
         steps.forEach { s ->
           addView(TextView(service).apply {

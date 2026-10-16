@@ -52,6 +52,7 @@ class NextStepAccessibilityService : AccessibilityService(), OverlayHost {
       // Inside NextStep itself the bubble and its menu aren't needed (they'd cover the screen).
       overlay.setBubbleHidden(true)
       overlay.closePopup()
+      if (!runner.isRunning) overlay.hidePanel() // an old explanation shouldn't sit on top of the app
     } else if (event.packageName != packageName) {
       overlay.setBubbleHidden(false)
       if (!runner.isRunning) overlay.closePopup()

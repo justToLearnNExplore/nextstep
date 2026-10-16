@@ -33,7 +33,7 @@ class ActionExecutor(private val service: AccessibilityService) {
       "press_key" -> pressKey(args.optString("key"))
       "open_app" -> openApp(args.optString("app_name"))
       "list_apps" -> ok().put("apps", listApps())
-      "wait" -> { Thread.sleep(args.optLong("seconds", 1).coerceIn(0, 10) * 1000); ok() }
+      "wait" -> { waitForChange(args.optLong("seconds", 1).coerceIn(0, 10) * 1000); ok() }
       "take_screenshot" -> ok()
       "open_play_store" -> openPlayStore(args.getString("package"))
       "open_link" -> openLink(args.getString("url"))
@@ -115,7 +115,7 @@ class ActionExecutor(private val service: AccessibilityService) {
       ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
       ?: return err("no_launch_intent")
     service.startActivity(intent)
-    settle(1500)
+    settle(3000)
     return ok().put("package", match.second)
   }
 
@@ -142,7 +142,7 @@ class ActionExecutor(private val service: AccessibilityService) {
     // Send the link straight to its app (no "Open with" chooser for the senior to deal with).
     LINK_APPS.entries.firstOrNull { url.contains(it.key) }?.value?.takeIf(::isInstalled)?.let(intent::setPackage)
     service.startActivity(intent)
-    settle(2000)
+    settle(3000)
     return ok()
   }
 
@@ -158,7 +158,7 @@ class ActionExecutor(private val service: AccessibilityService) {
         val launch = service.packageManager.getLaunchIntentForPackage(pkg)
           ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) ?: return ok().put("installed", true)
         service.startActivity(launch)
-        settle(2500)
+        settle(3000)
         return ok().put("installed", true).put("opened", true)
       }
       Thread.sleep(2000)
@@ -199,12 +199,50 @@ class ActionExecutor(private val service: AccessibilityService) {
     return null
   }
 
-  /** Give the UI time to react before the next screenshot. */
-  private fun settle(ms: Long = 700) = Thread.sleep(ms)
+  /**
+   * Waits until the screen stops changing (two equal reads 200 ms apart), at most [maxMs]. Most
+   * taps settle in ~0.5 s, so this is much quicker than a fixed pause, yet slow apps get longer.
+   */
+  private fun settle(maxMs: Long = 1200) {
+    Thread.sleep(MIN_SETTLE_MS)
+    val deadline = System.currentTimeMillis() + maxMs - MIN_SETTLE_MS
+    var last = screenSignature()
+    while (System.currentTimeMillis() < deadline) {
+      Thread.sleep(200)
+      val now = screenSignature()
+      if (now == last && now != 0) return
+      last = now
+    }
+  }
+
+  /** The model's "wait" (loading screens): returns as soon as the screen changes and settles. */
+  private fun waitForChange(maxMs: Long) {
+    val start = screenSignature()
+    val deadline = System.currentTimeMillis() + maxMs
+    while (System.currentTimeMillis() < deadline) {
+      Thread.sleep(250)
+      if (screenSignature() != start) { settle(1500); return }
+    }
+  }
+
+  /** Cheap fingerprint of what's on screen: package plus the text of up to 400 nodes. */
+  private fun screenSignature(): Int {
+    val root = service.rootInActiveWindow ?: return 0
+    var h = root.packageName?.hashCode() ?: 0
+    var n = 0
+    fun walk(x: AccessibilityNodeInfo?) {
+      if (x == null || n++ > 400) return
+      h = 31 * h + (x.text?.hashCode() ?: 0) + 7 * (x.contentDescription?.hashCode() ?: 0) + x.childCount
+      for (i in 0 until x.childCount) walk(x.getChild(i))
+    }
+    walk(root)
+    return h
+  }
 
   private fun ok() = JSONObject().put("ok", true)
 
   companion object {
+    private const val MIN_SETTLE_MS = 250L
     val LINK_APPS = mapOf(
       "blinkit.com" to "com.grofers.customerapp",
       "youtube.com" to "com.google.android.youtube",

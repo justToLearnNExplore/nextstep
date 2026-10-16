@@ -9,7 +9,6 @@ import { BigButton, Body, Screen, Title } from '../components/ui';
 import { type StringKey, useI18n } from '../i18n';
 import { startGoal } from '../lib/agent';
 import { post } from '../lib/api';
-import { saveLastOrder } from '../lib/grocery';
 import { colors, fonts, size } from '../theme';
 
 type GroceryList = { readable: boolean; items: { name: string; quantity: string }[]; say_to_user: string };
@@ -62,7 +61,6 @@ export default function GroceryPhoto() {
 
   const orderAll = async () => {
     Speech.stop();
-    await saveLastOrder(items);
     await startGoal(t('goalOrderItem').replace('{item}', items));
   };
 
