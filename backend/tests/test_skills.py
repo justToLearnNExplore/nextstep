@@ -264,3 +264,24 @@ def test_emptied_cart_folds_history_and_returns_to_search(task):
     track_cart(task, screen("Your cart is empty"))
     assert task.cart == "clear" and task.reopen_search
     assert len(task.history) == 2 and task.history[1].startswith("Emptied the old cart")
+
+
+def test_cart_is_opened_by_rule_and_not_marked_empty_without_proof(task):
+    import asyncio
+    from app.agent_loop import decide, track_cart
+    from app.protocol import Screen, UiNode
+    from app.store import MemoryStore
+    task.plan.skill_key = "blinkit_order_item"
+    task.history = ["Opening Blinkit"]
+    def screen(*labels):
+        return Screen(package="com.grofers.customerapp", width=1000, height=2000, screenshot_tried=True,
+                      nodes=[UiNode(i=i, text=t, click=True, b=[0, i * 100, 1000, i * 100 + 90]) for i, t in enumerate([*labels, *[f"x{k}" for k in range(8)]])])
+    # Search results with the old cart's bar: NextStep taps "View cart" itself, no AI.
+    res = asyncio.run(decide(MemoryStore(), task, screen("Choco chips ice cream", "View cart")))
+    assert res.source == "rule" and res.actions[0].name == "click" and task.cart == "clearing"
+    # An unusual page with no cart signs (loading, a notice) is not proof the cart is empty.
+    track_cart(task, screen("Something went wrong", "Retry"))
+    assert task.cart == "clearing"
+    # The shop closed (bad weather): nothing to clear, the AI just explains.
+    track_cart(task, screen("Blinkit is temporarily closed in your area"))
+    assert task.cart == "clear"

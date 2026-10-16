@@ -47,6 +47,8 @@ class TaskRecord(BaseModel):
     cart_from: int = 0  # history length when clearing began (those steps fold into one line)
     cart_turns: int = 0  # AI turns spent clearing; capped so it can never get stuck there
     reopen_search: bool = False  # cart just emptied: go back to the item search next
+    cart_page_seen: bool = False  # we've actually seen the cart with its items (bill etc.)
+    cart_absent: int = 0  # screens in a row without any cart sign, once the cart was seen
     # Cost/efficiency telemetry (shown to judges and in the action log).
     ai_calls: int = 0
     skill_steps: int = 0

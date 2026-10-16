@@ -32,6 +32,8 @@ BLINKIT = "com.grofers.customerapp"
 CART_BAR = re.compile(r"\bview cart\b", re.I)
 CART_PAGE = re.compile(r"bill details|grand total|to pay\b|delivery instructions", re.I)
 CART_EMPTY = re.compile(r"cart is empty|nothing in (your|the) cart", re.I)
+# The shop can't take orders right now: nothing to clear, the AI just tells the user.
+STORE_CLOSED = re.compile(r"temporarily closed|currently closed|store is closed|not delivering|unavailable in your area", re.I)
 MAX_CLEAR_TURNS = 8
 CLEAR_CART_HINT = (
     "before ordering, empty the cart left over from earlier. Open it (View cart). Then, in this turn, "
@@ -48,11 +50,21 @@ def track_cart(task: TaskRecord, screen: Screen) -> None:
     if not ordering or screen.package != BLINKIT or task.cart == "clear" or len(screen.nodes) < 8:
         return  # other app, done, or still loading
     text = " | ".join(n.label() for n in screen.nodes)
+    if STORE_CLOSED.search(text):
+        task.cart = "clear"  # no order possible now; the AI explains why
+        return
     has_cart = bool(CART_BAR.search(text) or CART_PAGE.search(text))
     if task.cart == "unknown":
         task.cart = "clearing" if has_cart else "clear"
         task.cart_from = len(task.history)
-    elif CART_EMPTY.search(text) or not has_cart or task.cart_turns >= MAX_CLEAR_TURNS:
+        return
+    if CART_PAGE.search(text):
+        task.cart_page_seen = True
+    # "Empty" needs proof: the app says so, or the cart (once seen) stays gone for two screens.
+    # A loading or unusual page in between is not proof (that marked an untouched cart "emptied").
+    task.cart_absent = 0 if has_cart else task.cart_absent + 1
+    gone = task.cart_page_seen and task.cart_absent >= 2
+    if CART_EMPTY.search(text) or gone or task.cart_turns >= MAX_CLEAR_TURNS:
         task.cart = "clear"
         # One line instead of a dozen "Removing ..." steps, so the operator's memory of this task
         # keeps what it actually added.
@@ -133,11 +145,22 @@ async def decide(store: Store, task: TaskRecord, screen: Screen) -> StepResponse
     # Old items in the cart: the AI empties it first (never replayed, never learned).
     track_cart(task, screen)
     if task.cart == "clearing":
+        # Opening the cart is one known tap: no AI (it once searched instead of opening it).
+        bar = next((nd for nd in screen.nodes if CART_BAR.search(nd.label()) and nd.click), None) \
+            or next((nd for nd in screen.nodes if CART_BAR.search(nd.label())), None)
+        if bar is not None and not task.cart_page_seen:
+            task.rule_steps += 1
+            x, y = screen.norm_box(bar)
+            act = _gate(task, screen, "click", {"x": x, "y": y, "intent": phrase(task.language, "opening_cart")}, f"cart-{n}")
+            _remember(task, screen, [act], learnable=False)
+            return StepResponse(actions=[act], status_text=act.intent, source="rule")
         if wants_screenshot(task, screen):
             return StepResponse(need_screenshot=True)
         task.cart_turns += 1
         # No repeat guard here: the next item's '−' sits where the last one was. MAX_CLEAR_TURNS caps it.
         res = await next_actions(task, screen, CLEAR_CART_HINT, max_actions=8)
+        # Searching belongs after the cart is empty (NextStep reopens the search itself then).
+        res.actions = [a for a in res.actions if a.name != "open_link"]
         _remember(task, screen, res.actions, learnable=False)
         return res
     if task.reopen_search:
