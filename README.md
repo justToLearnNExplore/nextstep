@@ -6,6 +6,7 @@
 
 | | |
 |---|---|
+| 🌐 **Website (start here)** | **https://nextstep-northstar.web.app**: download the app, watch the demos, see the family view |
 | 📱 **Download the Android app** | [**NextStep.apk** (latest release)](https://github.com/justToLearnNExplore/nextstep/releases/latest/download/NextStep.apk) · [all releases](https://github.com/justToLearnNExplore/nextstep/releases) |
 | ▶️ **4-minute demo** | https://youtu.be/HlGCqERawWU |
 | ▶️ **All features (full walkthrough)** | https://youtu.be/MHEeDlpe5HM |
@@ -21,7 +22,7 @@ Seniors, house help and millions of first-time smartphone users depend on someon
 
 ### Install (2 minutes)
 
-1. On an Android phone (**Android 10 or newer**), open the [latest NextStep.apk](https://github.com/justToLearnNExplore/nextstep/releases/latest/download/NextStep.apk).
+1. On an Android phone (**Android 10 or newer**), open **https://nextstep-northstar.web.app** and tap **Download NextStep for Android**, or download the [latest NextStep.apk](https://github.com/justToLearnNExplore/nextstep/releases/latest/download/NextStep.apk) directly.
 2. Open the downloaded file. If asked, allow **Install unknown apps** for your browser or file manager. This is a prototype build signed with a development key, so Android may show an "unknown developer" warning.
 3. Open **NextStep**. Setup walks you through:
    - choosing a language (English, हिंदी, ಕನ್ನಡ);
@@ -118,7 +119,7 @@ Safety is layered, and each layer can only make a gate stricter:
 |---|---|
 | **Gemini** (3.8 Flash; 3.5 Flash-Lite for quick checks) | Plans tasks, chooses each tap (function calling, with **Computer Use** as fallback), explains screens, reads medicine labels and grocery lists, checks scams, and summarises missed calls. Structured outputs via **Google ADK** agents. |
 | **Cloud Run** (`asia-south1`, Mumbai) | FastAPI + Google ADK agent backend: planner, operator, Guardian, learned routines. Scales to zero when idle. |
-| **Firebase** | **Anonymous Auth** gives voice-named accounts with no login; **Hosting** serves the family view, with `/api/**` routed to Cloud Run. |
+| **Firebase** | **Anonymous Auth** gives voice-named accounts with no login; **Hosting** serves the website ([nextstep-northstar.web.app](https://nextstep-northstar.web.app): app download, demos, family view), with `/api/**` routed to Cloud Run. |
 | **Firestore** | Tasks and action logs, learned routines, profiles and the family timeline. No screenshots, photos or message texts are stored. Locked to the backend (no client access). |
 | **Cloud Speech-to-Text** | Voice input in English, Hindi and Kannada. |
 | **Secret Manager** | Gemini API key. |
