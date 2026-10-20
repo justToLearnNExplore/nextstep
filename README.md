@@ -24,6 +24,8 @@ Seniors, house help and millions of first-time smartphone users depend on someon
 
 1. On an Android phone (**Android 10 or newer**), open **https://nextstep-northstar.web.app** and tap **Download NextStep for Android**, or download the [latest NextStep.apk](https://github.com/justToLearnNExplore/nextstep/releases/latest/download/NextStep.apk) directly.
 2. Open the downloaded file. If asked, allow **Install unknown apps** for your browser or file manager. This is a prototype build signed with a development key, so Android may show an "unknown developer" warning.
+   - **If Google Play Protect blocks it** ("App blocked" / "Unsafe app"), tap **More details → Install anyway**.
+   - If there's no such option, **turn off Play Protect** for the install: **Play Store → your profile picture → Play Protect → ⚙ Settings → turn off "Scan apps with Play Protect"**, then install NextStep. Turn it back on afterwards.
 3. Open **NextStep**. Setup walks you through:
    - choosing a language (English, हिंदी, ಕನ್ನಡ);
    - allowing the **microphone**;
