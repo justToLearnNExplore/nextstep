@@ -29,4 +29,10 @@ dependencies {
   implementation "androidx.camera:camera-lifecycle:$camerax"
   implementation "androidx.camera:camera-view:$camerax"
   implementation "com.google.mlkit:text-recognition:16.0.1"
+
+  // Enhanced security (upon mentorship): on-device detector for phone / card / bank numbers,
+  // hidden before the screen leaves the phone. Its small model downloads once at runtime.
+  implementation "com.google.mlkit:entity-extraction:16.0.0-beta6"
+
+  testImplementation "junit:junit:4.13.2"
 }

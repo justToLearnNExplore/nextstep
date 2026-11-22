@@ -1,5 +1,6 @@
 package com.northstar.nextstep.agent.safety
 
+import com.northstar.nextstep.agent.screen.PrivacyFilter
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -42,11 +43,9 @@ object SafetyGate {
     RegexOption.IGNORE_CASE,
   )
 
-  private val SECRET_FIELD = Regex(
-    "(password|passcode|pass code|\\bpin\\b|mpin|upi pin|otp|one.time|verification code|cvv|cvc|" +
-      "card number|expiry|aadhaar|पासवर्ड|पिन|ओटीपी|ಪಾಸ್‌ವರ್ಡ್|ಪಿನ್|ಒಟಿಪಿ)",
-    RegexOption.IGNORE_CASE,
-  )
+  // Enhanced security (upon mentorship): one shared word list, so the boxes whose values the
+  // phone hides are exactly the boxes this gate treats as user-only. Same words as before.
+  private val SECRET_FIELD = PrivacyFilter.SECRET_WORDS
 
   fun check(name: String, args: JSONObject, pkg: String, nodes: JSONArray, w: Int, h: Int): Verdict {
     if (pkg in PAYMENT_APPS) return Verdict(Gate.PRIVATE, "payment_app")

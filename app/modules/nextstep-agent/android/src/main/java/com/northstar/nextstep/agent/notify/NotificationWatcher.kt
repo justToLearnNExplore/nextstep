@@ -5,6 +5,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.northstar.nextstep.agent.NextStepAccessibilityService
 import com.northstar.nextstep.agent.Prefs
+import com.northstar.nextstep.agent.screen.PrivacyFilter
 
 /**
  * Scam shield input. Only runs when the user has granted notification access AND opted in inside
@@ -19,14 +20,18 @@ class NotificationWatcher : NotificationListenerService() {
     if (sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
     val extras = sbn.notification.extras
     val sender = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-    val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+    val raw = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
       ?: extras.getCharSequence(Notification.EXTRA_TEXT))?.toString().orEmpty()
+    // Enhanced security (upon mentorship): OTP codes, card and Aadhaar numbers are hidden before
+    // the message is kept or checked. Words stay, so scam checks still see "OTP", links and
+    // senders as before; phone numbers are kept because scam checks use them.
+    val text = PrivacyFilter.maskText(raw, phones = false) ?: raw
     // For "What did I miss?": kept in memory only, for one hour.
     remember(sbn.packageName, sender, text, sbn.postTime)
-    if (!Prefs(this).scamCheckEnabled || text.length < 12) return
+    if (!Prefs(this).scamCheckEnabled || raw.length < 12) return
 
     // Messaging apps re-post the same notification; check each message once.
-    val key = "${sbn.packageName}|$sender|${text.hashCode()}"
+    val key = "${sbn.packageName}|$sender|${raw.hashCode()}"
     if (!seen.add(key)) return
     if (seen.size > 200) seen.remove(seen.first())
 

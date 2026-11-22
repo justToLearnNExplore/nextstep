@@ -64,7 +64,7 @@ The backend is already live on Cloud Run, so there's nothing else to set up.
 | **Medicine help** | A voice-guided camera ("move closer", "hold steady", "more light") for shaky hands, which turns green only when the label is readable (on-device ML Kit). Gemini reads out the name, what it's for and the expiry date. One tap sends the photo to your doctor or family on WhatsApp, after asking first. |
 | **Phone help** | Fixes silent mode or low volume (after asking), and reads out missed calls and new messages from the last hour. OTPs are never read out. |
 | **Family view** | A live timeline on Firebase Hosting, shared with a one-time WhatsApp link. No login for the senior. |
-| **Safe by design** | Asks before anything irreversible; hands every password, OTP, PIN and UPI step to the user; two independent safety gates. |
+| **Safe by design** | Asks before anything irreversible; hands every password, OTP, PIN and UPI step to the user; two independent safety gates; passwords, OTPs, card, Aadhaar and phone numbers are hidden on the phone before anything is sent, in text and screenshots. |
 | **Learns routines** | A successful task becomes a recipe. Repeats replay it, with one quick AI check at the end. |
 | **Senior-first UI** | Atkinson Hyperlegible type, AAA contrast, 64dp+ touch targets, icons with words, one-line labels, everything spoken aloud. The mic opens only when you tap it. |
 
@@ -113,6 +113,23 @@ Safety is layered, and each layer can only make a gate stricter:
 2. The server-side **Guardian** (`backend/app/guardian.py`).
 3. The on-device **SafetyGate** (`SafetyGate.kt`), which re-checks every action against the live screen right before it runs.
 
+### Privacy on the phone (enhanced security, added after mentorship)
+
+Before the screen leaves the phone, NextStep hides sensitive **values**. Labels, buttons and safety decisions stay exactly the same, so every task works as before.
+
+| What | How it is hidden |
+|---|---|
+| Password boxes (marked by the app) | Text never read; the box is sent only as `secure` |
+| Boxes **named** password / PIN / OTP / CVV / card number / Aadhaar, even if the app forgot the password flag | Value replaced with `••••` (same English, Hindi and Kannada word list the SafetyGate uses) |
+| Number-only entries on login / OTP screens, including split OTP boxes | `••••` |
+| OTP codes in any text ("Your OTP is 482913", "482913 is your verification code") | `••••` |
+| Card numbers (Luhn-checked) and Aadhaar numbers (Verhoeff-checked) | `•••• 1111`, `•••• •••• 0124` |
+| Phone numbers in read-only text | `••••••3210`, using fixed rules plus **ML Kit Entity Extraction** on the device (phone, card and IBAN numbers in any format) |
+| **Screenshots** | Every hidden value, and every password box, is painted black in the picture before it is sent |
+| Message notifications (scam shield, "What did I miss?") | OTP codes, card and Aadhaar numbers hidden; sender and words kept for scam checks |
+
+Deliberately kept, so nothing breaks: addresses (needed to book rides and deliveries), what NextStep itself typed into ordinary boxes, and box labels. ML Kit's small model downloads once in the background; until it is ready, or if it is slow, the fixed rules still apply. Rules and examples are unit-tested in `PrivacyFilterTest.kt`.
+
 ---
 
 ## Built on Google Cloud
@@ -149,6 +166,7 @@ Measured on Cloud Run (asia-south1) with Gemini 3.8 Flash and a moto g8 power li
 | App UI | React Native + Expo, Expo Router, TypeScript |
 | Phone control | Kotlin Expo module: AccessibilityService (screen tree, gestures, screenshots; MediaProjection on Android 10), accessibility overlay, Intents, NotificationListenerService, TextToSpeech, AudioRecord with voice-activity detection |
 | Camera | CameraX + ML Kit text recognition (on-device readable-label check) |
+| On-device privacy | Fixed masking rules + ML Kit Entity Extraction; screenshots blacked out where values are hidden |
 | Agents | **Google ADK** (Python): planner, operator, screen explainer, scam shield, medicine reader, grocery-list reader, missed-calls summariser |
 | Backend | FastAPI on **Cloud Run** |
 | Data | **Firestore**, **Firebase Auth** (anonymous), **Secret Manager** |
@@ -167,6 +185,8 @@ app/                              React Native app (Expo)
       exec/ActionExecutor.kt            actions → gestures / intents, waits until the screen settles
       safety/SafetyGate.kt              on-device gate (escalate-only)
       screen/ScreenReader.kt            accessibility tree + screenshot (ProjectionService on Android 10)
+      screen/PrivacyFilter.kt           hides passwords, OTPs, card / Aadhaar / phone numbers before sending
+      screen/EntityMasker.kt            ML Kit on-device entity detection (phone, card, IBAN)
       voice/VoiceIO.kt                  speech in (Cloud STT) / out (TTS)
       medicine/                         CameraX view + ML Kit label analyser
       notify/NotificationWatcher.kt     scam shield input (opt-in)
@@ -237,4 +257,5 @@ Voice input and output, the overlay and model output all follow the language tag
 - **Android only** (10 or newer). iOS does not allow this kind of control.
 - **Apps change.** Third-party apps change their UI. The operator works from the screen itself and retries, but some flows can still break.
 - **Secure screens.** Some apps mark screens as secure. Screenshots there are black, so NextStep relies on the accessibility tree.
+- **Privacy masking is rule-based.** A private box with no recognisable name, inside an app that also skips the password flag, can still be missed; payment and PIN steps are always handed to the user regardless. Addresses are not masked, because NextStep needs them to book rides and deliveries.
 - **Cash on delivery** depends on the shop. If it isn't available, NextStep hands payment to the user.

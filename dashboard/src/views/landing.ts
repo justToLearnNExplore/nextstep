@@ -26,7 +26,7 @@ function appSection() {
       'a',
       { href: APK_URL, class: 'btn download', download: 'NextStep.apk' },
       icon('download', 'ic'),
-      h('span', {}, h('strong', {}, 'Download NextStep for Android'), h('small', {}, 'APK · Android 10 or newer · about 110 MB')),
+      h('span', {}, h('strong', {}, 'Download NextStep for Android'), h('small', {}, 'APK · Android 10 or newer · about 120 MB')),
     ),
     h(
       'div',
